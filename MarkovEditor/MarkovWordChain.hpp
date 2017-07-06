@@ -31,6 +31,8 @@ public:
     MarkovWordChain(string fname, string seedWord, int numLevels,float parBegin, float parEnd, float x,int steps,int itr,int kit,float mpar,int mt);
     void CreateMarkovWordChain();
     void ComputeProbabilities();
+    void CreateNLevelMarkovChain();
+    void ComputeNLevelProbabilities();
     void LoadChaosMap(float parBegin, float parEnd, float x,int steps,int itr,int kit,float mpar,mapType mpType);
     void setMyMtype(int mt);
     void LoadTextIntoVector(string fname);
@@ -61,11 +63,15 @@ private:
     typedef map<int,rWordMap> rLevelMap;
     typedef map<string,wordMap> markovChain;
     typedef map<string,rWordMap> markovRChain;
-    
+    typedef map<string,levelMap> markovChainNLevel;
+    typedef map<string,rLevelMap> markovProbChainNLevel;
     vector<string> Words;
     
     markovChain myMarkovChain;
     markovRChain myProbChain;
+    
+    markovChainNLevel myMarkovChainNLevel;
+    markovProbChainNLevel myProbChainNLevel;
     
     int nlevels;
     markovChain::iterator itMrk;
