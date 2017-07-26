@@ -24,18 +24,24 @@
 
 using namespace std;
 
+enum MarkovMode {BY_WORD = 0 , BY_NWORD, BY_CHAR};
+
 class MarkovWordChain
 {
 public:
     MarkovWordChain();
     MarkovWordChain(string fname, string seedWord, int numLevels,float parBegin, float parEnd, float x,int steps,int itr,int kit,float mpar,int mt);
     void CreateMarkovWordChain();
+    //compute probabilities is used for both by char and by cumulative words modes
     void ComputeProbabilities();
     void CreateNLevelMarkovChain();
     void ComputeNLevelProbabilities();
+    void CreateMarkovCharChain();
+    
     void LoadChaosMap(float parBegin, float parEnd, float x,int steps,int itr,int kit,float mpar,mapType mpType);
     void setMyMtype(int mt);
     void LoadTextIntoVector(string fname);
+    void LoadTextIntoVectorByChar(string fname);
     vector<string> splitString(const std::string& text, const std::string& delims);
     string GetFoundWord();
     string GetFirstWord();
@@ -43,9 +49,20 @@ public:
     
     void GetNextProbChain();
     void GetNextWordInProbChain();
+    void GetNextNLevelProbChain();
+    void GetNextWordInNLevelProbChain();
+    void GetNextProbChainByChar();
+    void GetNextStrInProbChainByChar();
     
+    float GetProbability();
     void ClearMarkovChain();
     void SetupMarkovChain();
+    void SetupCharMarkovChain();
+    void ClearNLevelMarkovChain();
+    void SetupNLevelMarkovChain();
+    
+    void SetKeyWord();
+    void SetNextWord();
     //inlines
     inline void setUseChaosMap(bool uch) { useChaosMap = uch;}
     inline bool getUseChaosMap() { return useChaosMap;}
@@ -54,6 +71,8 @@ public:
     inline void setNumLevels(int nl) { nlevels = nl; }
     inline int getNumLevels() { return nlevels; }
     inline bool getChainIsReady() { return chainIsReady;}
+    inline void setMarkovMode(MarkovMode mode) { mmode = mode; }
+    inline int getMarkovMode() { return mmode;}
     
     
 private:
@@ -67,16 +86,22 @@ private:
     typedef map<string,rLevelMap> markovProbChainNLevel;
     vector<string> Words;
     
+    //by words cumulative string or by char
     markovChain myMarkovChain;
     markovRChain myProbChain;
     
+    //by words N-Words-Away
     markovChainNLevel myMarkovChainNLevel;
     markovProbChainNLevel myProbChainNLevel;
     
-    int nlevels;
+    int nlevels,curlevel;
     markovChain::iterator itMrk;
     markovRChain::iterator itRMrk;
     markovChain::iterator itMrkActive;
+    
+    markovChainNLevel::iterator itNMrk;
+    markovProbChainNLevel::iterator itNRMrk;
+    rLevelMap::iterator itRLvl;
     //chaos stuff
     ChaosMap *myMap;
     mapType  myMtype;
@@ -87,10 +112,17 @@ private:
     vector<double>::iterator probItr;
     
     //found word
+    string seedWord;
     string foundWord;
     string firstWord;
     
+    string keyWord;
+    string nextWord;
     bool chainIsReady;
+    
+    //markov mode
+    //cumulative token or N words away
+    MarkovMode mmode;
   
     
 };

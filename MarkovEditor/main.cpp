@@ -30,6 +30,7 @@
 #include <FL/Fl_Text_Buffer.H>
 #include <FL/Fl_Text_Editor.H>
 #include <Fl/Fl_Value_Slider.H>
+#include <Fl/Fl_Choice.H>
 #include <FL/filename.H>
 #include "MarkovWordChain.hpp"
 
@@ -85,6 +86,7 @@ public:
     Fl_Value_Slider *nLevelSlider;
     Fl_Value_Slider *wordsPerLine;
     Fl_Value_Slider *linesPerParagraph;
+    Fl_Choice *markovMode;
     
     
     int			wrap_mode;
@@ -420,21 +422,81 @@ void view_cb(Fl_Widget*, void*) {
 }
 
 
-void load_MarkovData(const char *newfile)
+void load_MarkovData(const char *newfile, int mval)
 {
     string fname(newfile);
-    myMarkovChain->LoadTextIntoVector(fname);
+    if(mval == 0) {
+        myMarkovChain->LoadTextIntoVectorByChar(fname);
+    } else {
+        myMarkovChain->LoadTextIntoVector(fname);
+    }
     
 }
 
-void loadMarkov_cb(Fl_Widget*, void*)
+void loadMarkov_cb(Fl_Widget*, void*v)
 {
+    EditorWindow* e = (EditorWindow*)v;
     Fl_Native_File_Chooser fnfc;
     fnfc.title("Load Text for Markov Chain");
     fnfc.type(Fl_Native_File_Chooser::BROWSE_FILE);
     if ( fnfc.show() ) return;
-    load_MarkovData(fnfc.filename());
+    load_MarkovData(fnfc.filename(),e->markovMode->value());
     
+}
+
+void gen_SetUpMarkovChain(void *v)
+{
+    EditorWindow* e = (EditorWindow*)v;
+    if(e->markovMode->value() == 0) {
+        myMarkovChain->SetupCharMarkovChain();
+        myMarkovChain->setMarkovMode(BY_CHAR);
+    }
+    if(e->markovMode->value() == 1) {
+        myMarkovChain->SetupMarkovChain();
+        myMarkovChain->setMarkovMode(BY_WORD);
+    }
+    if(e->markovMode->value() == 2) {
+        myMarkovChain->SetupNLevelMarkovChain();
+        myMarkovChain->setMarkovMode(BY_NWORD);
+    }
+}
+
+void gen_ClearMarkovChain()
+{
+    switch (myMarkovChain->getMarkovMode()) {
+        case BY_CHAR:
+            myMarkovChain->ClearMarkovChain();
+            break;
+        case BY_WORD:
+            myMarkovChain->ClearMarkovChain();
+            break;
+        case BY_NWORD:
+            myMarkovChain->ClearNLevelMarkovChain();
+            break;
+            
+        default:
+            break;
+    }
+}
+
+void gen_GetNextMarkovChain()
+{
+    switch (myMarkovChain->getMarkovMode()) {
+        case BY_CHAR:
+            myMarkovChain->GetNextProbChainByChar();
+            myMarkovChain->GetNextStrInProbChainByChar();
+            break;
+        case BY_WORD:
+            myMarkovChain->GetNextProbChain();
+            myMarkovChain->GetNextWordInProbChain();
+            break;
+        case BY_NWORD:
+            myMarkovChain->GetNextNLevelProbChain();
+            myMarkovChain->GetNextWordInNLevelProbChain();
+            break;
+        default:
+            break;
+    }
 }
 
 void genText_cb(Fl_Widget* w, void* v)
@@ -445,14 +507,15 @@ void genText_cb(Fl_Widget* w, void* v)
     myMarkovChain->setSeedWord(e->seedWord->value());
     myMarkovChain->setNumLevels(e->nLevelSlider->value());
     if(!myMarkovChain->getChainIsReady()) {
-        myMarkovChain->SetupMarkovChain();
+        gen_SetUpMarkovChain(v);
         maxWordsPerLine = e->wordsPerLine->value() + floor((float)rand()/RAND_MAX*e->wordsPerLine->value());
         maxLinesPerParagraph = e->linesPerParagraph->value() + floor((float)rand()/RAND_MAX*e->linesPerParagraph->value());
         printf("MAX: %d %d %f\n",maxWordsPerLine,maxLinesPerParagraph,(float)rand()/RAND_MAX);
     } else {
         textbuf->text("");
-        myMarkovChain->ClearMarkovChain();
-        myMarkovChain->SetupMarkovChain();
+        gen_ClearMarkovChain();
+        gen_SetUpMarkovChain(v);
+        
         nWordsPerLine = 0;
         nLinesPerParagraph = 0;
         maxWordsPerLine = e->wordsPerLine->value() + floor((float)rand()/RAND_MAX*e->wordsPerLine->value());
@@ -460,11 +523,26 @@ void genText_cb(Fl_Widget* w, void* v)
 
     }
     for(int i=0; i<num; i++) {
-        myMarkovChain->GetNextProbChain();
-        myMarkovChain->GetNextWordInProbChain();
-       // printf("%s\n",myMarkovChain->GetFoundWord().c_str());
-        
-            
+        // printf("%s\n",myMarkovChain->GetFoundWord().c_str());
+        gen_GetNextMarkovChain();
+        if(nWordsPerLine >= maxWordsPerLine) {
+            textbuf->append("\n");
+            nWordsPerLine = 0;
+            maxWordsPerLine = e->wordsPerLine->value() + floor((float)rand()/RAND_MAX*e->wordsPerLine->value());
+            nLinesPerParagraph++;
+        }
+        if(nLinesPerParagraph >= maxLinesPerParagraph) {
+            textbuf->append("\n");
+            textbuf->append("\n");
+            //textbuf->append("\t");
+            maxLinesPerParagraph = e->linesPerParagraph->value() + floor((float)rand()/RAND_MAX*e->linesPerParagraph->value());
+            nLinesPerParagraph = 0;
+            nWordsPerLine = 0;
+        }
+        //textbuf->append(" ");
+        textbuf->append(myMarkovChain->GetFoundWord().c_str());
+        nWordsPerLine++;
+
         
         //make paragraphs only if ending on punctuation
        // if(nLinesPerParagraph  >= maxLinesPerParagraph) {
@@ -474,7 +552,7 @@ void genText_cb(Fl_Widget* w, void* v)
           //  nLinesPerParagraph = 0;
        // }
 
-        if(ispunct(myMarkovChain->GetFoundWord().c_str()[0])) {
+        /*if(ispunct(myMarkovChain->GetFoundWord().c_str()[0])) {
             textbuf->append(myMarkovChain->GetFoundWord().c_str());
             if(nWordsPerLine >= maxWordsPerLine) {
                 textbuf->append("\n");
@@ -497,7 +575,7 @@ void genText_cb(Fl_Widget* w, void* v)
             textbuf->append(" ");
             textbuf->append(myMarkovChain->GetFoundWord().c_str());
             nWordsPerLine++;
-        }
+        }*/
         
     }
     
@@ -581,8 +659,18 @@ Fl_Window* new_view() {
     w->numberOfWords->labelfont(FL_BOLD);
     w->numberOfWords->value("1000");
     
+    //markov mode
+    w->markovMode = new Fl_Choice(300, 650, 120, 30, "&Markov Mode");
+    w->markovMode->labelsize(10);
+    w->markovMode->align(FL_ALIGN_TOP);
+    w->markovMode->labelfont(FL_BOLD);
+    w->markovMode->add("BY_CHAR");
+    w->markovMode->add("BY_WORD");
+    w->markovMode->add("BY_NWORD");
+    w->markovMode->value(0);
+    
     //words per line slider
-    w->wordsPerLine = new Fl_Value_Slider(300,650,120, 30, "Words Per Line");
+    w->wordsPerLine = new Fl_Value_Slider(440,650,120, 30, "Words Per Line");
     w->wordsPerLine->type(FL_HOR_NICE_SLIDER);
     w->wordsPerLine->step(1);
     w->wordsPerLine->value(15);
@@ -591,7 +679,7 @@ Fl_Window* new_view() {
     w->wordsPerLine->labelfont(FL_BOLD);
     w->wordsPerLine->align(FL_ALIGN_TOP);
     
-    w->linesPerParagraph = new Fl_Value_Slider(300,700,120, 30, "Lines Per Paragraph");
+    w->linesPerParagraph = new Fl_Value_Slider(440,700,120, 30, "Lines Per Paragraph");
     w->linesPerParagraph->type(FL_HOR_NICE_SLIDER);
     w->linesPerParagraph->step(1);
     w->linesPerParagraph->value(15);
