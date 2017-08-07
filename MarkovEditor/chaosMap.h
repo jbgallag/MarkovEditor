@@ -15,6 +15,7 @@ class ChaosMap {
 public:
 
 	ChaosMap(double beginPar, double endPar, double initX, int nSteps, int iterations, int keep_it, double mPar, mapType mtype);
+    ~ChaosMap();
         inline void setBeginPar(double beginPar) { myBPar = beginPar;};
         inline double getBeginPar() { return myBPar;};
 	inline void setEndPar(double endPar) { myEPar = endPar;};

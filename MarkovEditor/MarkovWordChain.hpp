@@ -42,6 +42,7 @@ public:
     void setMyMtype(int mt);
     void LoadTextIntoVector(string fname);
     void LoadTextIntoVectorByChar(string fname);
+    void LoadTextFromWordsToLetters();
     vector<string> splitString(const std::string& text, const std::string& delims);
     string GetFoundWord();
     string GetFirstWord();
@@ -66,6 +67,24 @@ public:
     //inlines
     inline void setUseChaosMap(bool uch) { useChaosMap = uch;}
     inline bool getUseChaosMap() { return useChaosMap;}
+    inline void setParBegin(float pb) { parBegin = pb;}
+    inline float getParBegin() { return parBegin; }
+    inline void setParEnd(float pb) { parEnd = pb;}
+    inline float getParEnd() { return parEnd; }
+    inline void setSteps(int st) { steps = st;}
+    inline int getSteps() { return steps;};
+    inline void setItr(int it) { itr = it; }
+    inline int getItr() { return itr;}
+    inline void setKit(int kt) { kit = kt;}
+    inline int getKit() { return kit;}
+    inline void setMpar(float mp) { mpar = mp;}
+    inline float getMpar() { return mpar;}
+    inline void setX(float xin) { x = xin;}
+    inline float getX() { return x;}
+
+    inline void setMyMapType(mapType mt) { myMtype = mt; }
+    inline mapType getMyMapType() { return myMtype;}
+
     inline void setSeedWord(string sdw) { firstWord = sdw; }
     inline string getSeedWord() { return firstWord; }
     inline void setNumLevels(int nl) { nlevels = nl; }
@@ -73,6 +92,8 @@ public:
     inline bool getChainIsReady() { return chainIsReady;}
     inline void setMarkovMode(MarkovMode mode) { mmode = mode; }
     inline int getMarkovMode() { return mmode;}
+    inline void setFirstRun(bool fr) { firstRun = fr;}
+    inline bool getFirstRun() { return firstRun;}
     
     
 private:
@@ -85,6 +106,7 @@ private:
     typedef map<string,levelMap> markovChainNLevel;
     typedef map<string,rLevelMap> markovProbChainNLevel;
     vector<string> Words;
+    vector<string> Letters;
     
     //by words cumulative string or by char
     markovChain myMarkovChain;

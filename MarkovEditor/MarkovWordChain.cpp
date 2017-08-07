@@ -28,6 +28,7 @@ MarkovWordChain::MarkovWordChain()
     chainIsReady = false;
     mmode = BY_CHAR;
     curlevel = 1;
+    srand((unsigned int)time(NULL));
 }
 
 MarkovWordChain::MarkovWordChain(string fname, string seedWord, int numLevels,float parBegin, float parEnd, float x,int steps,int itr,int kit,float mpar,int mt)
@@ -56,6 +57,10 @@ void MarkovWordChain::ClearMarkovChain()
     myProbChain.clear();
     chainIsReady = false;
     curlevel = 1;
+    if(getUseChaosMap()) {
+        delete myMap;
+        setUseChaosMap(false);
+    }
 }
 
 void MarkovWordChain::SetupMarkovChain()
@@ -65,6 +70,7 @@ void MarkovWordChain::SetupMarkovChain()
     if(getUseChaosMap())
         LoadChaosMap(parBegin,parEnd,x,steps,itr,kit,mpar,myMtype);
     chainIsReady = true;
+    firstRun = true;
 }
 
 void MarkovWordChain::SetupCharMarkovChain()
@@ -74,6 +80,7 @@ void MarkovWordChain::SetupCharMarkovChain()
     if(getUseChaosMap())
         LoadChaosMap(parBegin,parEnd,x,steps,itr,kit,mpar,myMtype);
     chainIsReady = true;
+    firstRun = true;
 }
 
 void MarkovWordChain::ClearNLevelMarkovChain()
@@ -94,6 +101,10 @@ void MarkovWordChain::ClearNLevelMarkovChain()
     myProbChainNLevel.clear();
     curlevel = 1;
     chainIsReady = false;
+    if(getUseChaosMap()) {
+        delete myMap;
+        setUseChaosMap(false);
+    }
 }
 
 void MarkovWordChain::SetupNLevelMarkovChain()
@@ -103,6 +114,7 @@ void MarkovWordChain::SetupNLevelMarkovChain()
     if(getUseChaosMap())
         LoadChaosMap(parBegin,parEnd,x,steps,itr,kit,mpar,myMtype);
     chainIsReady = true;
+    firstRun = true;
 }
 
 vector<string> MarkovWordChain::splitString(const string &text, const string &delims)
@@ -167,6 +179,11 @@ void MarkovWordChain::LoadTextIntoVector(string fname)
         aLine = regex_replace(aLine, nline, " ");
         aLine = regex_replace(aLine, rline, " ");
         aLine = regex_replace(aLine, spc, " ");
+        for(string::iterator itS = aLine.begin(); itS != aLine.end(); itS++) {
+            string str;
+            str = *itS;
+            Letters.push_back(str);
+        }
         wordsInLine = splitString(aLine, " ");
         for(vector<string>::iterator itS =  wordsInLine.begin(); itS != wordsInLine.end(); itS++) {
             Words.push_back(*itS);
@@ -174,6 +191,17 @@ void MarkovWordChain::LoadTextIntoVector(string fname)
         wordsInLine.clear();
     }
     
+}
+
+void MarkovWordChain::LoadTextFromWordsToLetters()
+{
+    for(vector<string>::iterator itS = Words.begin(); itS != Words.end(); itS++) {
+        for(string::iterator itSS = itS->begin(); itSS != itS->end(); itSS++) {
+            string str; // = &*itSS;
+            str = *itSS;
+            Letters.push_back(str);
+        }
+    }
 }
 
 void MarkovWordChain::CreateNLevelMarkovChain()
@@ -250,19 +278,19 @@ void MarkovWordChain::CreateMarkovWordChain()
 
 void MarkovWordChain::CreateMarkovCharChain()
 {
-    printf("Words size: %lu %d\n",Words.size(),nlevels);
-    for(int i=0; i<Words.size()-nlevels; i++) {
+    printf("Letters size: %lu %d\n",Letters.size(),nlevels);
+    for(int i=0; i<Letters.size()-nlevels; i++) {
         string keyString;
         string nextString;
         //build up the keyString and nextString
         for(int j=0; j<nlevels; j++) {
-            keyString.append(Words[i+j]);
+            keyString.append(Letters[i+j]);
         }
         //get next nlevel characters
         for(int j=0; j<nlevels; j++) {
-            nextString.append(Words[i+nlevels+j]);
+            nextString.append(Letters[i+nlevels+j]);
         }
-        printf("keyString: %s string: %s\n",keyString.c_str(),nextString.c_str());
+    //    printf("keyString: %s string: %s\n",keyString.c_str(),nextString.c_str());
         itMrk = myMarkovChain.find(keyString);
         if(itMrk == myMarkovChain.end()) {
             wordMap *aWordMap = new wordMap;
@@ -280,7 +308,7 @@ void MarkovWordChain::CreateMarkovCharChain()
         }
     }
     
-    printf("Finished building markov CHAR chain: %lu\n",myMarkovChain.size());
+    printf("Finished building markov CHAR chain: %lu fw: %s\n",myMarkovChain.size(),GetFirstWord().c_str());
 }
 
 void MarkovWordChain::ComputeNLevelProbabilities()

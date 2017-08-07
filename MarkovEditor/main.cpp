@@ -10,6 +10,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <cstring>
+#include <iostream>
+#include <algorithm>
 #include <ctype.h>
 #include <errno.h>
 
@@ -26,6 +29,8 @@
 #include <FL/Fl_Menu_Bar.H>
 #include <FL/Fl_Input.H>
 #include <FL/Fl_Button.H>
+#include <FL/Fl_Light_Button.H>
+#include <FL/Fl_Check_Button.H>
 #include <FL/Fl_Return_Button.H>
 #include <FL/Fl_Text_Buffer.H>
 #include <FL/Fl_Text_Editor.H>
@@ -44,6 +49,7 @@ int nLinesPerParagraph = 0;
 int maxWordsPerLine;
 int maxLinesPerParagraph;
 int firstLinePos = 0;
+bool newGen = true;
 MarkovWordChain *myMarkovChain = new MarkovWordChain();
 
 // width of line number display, if enabled
@@ -87,6 +93,15 @@ public:
     Fl_Value_Slider *wordsPerLine;
     Fl_Value_Slider *linesPerParagraph;
     Fl_Choice *markovMode;
+    Fl_Choice *markovDist;
+    
+    Fl_Check_Button *aprxWords;
+    Fl_Check_Button *aprxLines;
+    
+    Fl_Value_Slider *parBegin;
+    Fl_Value_Slider *parEnd;
+    Fl_Value_Slider *seedValue;
+    Fl_Value_Slider *keepItr;
     
     
     int			wrap_mode;
@@ -422,31 +437,66 @@ void view_cb(Fl_Widget*, void*) {
 }
 
 
-void load_MarkovData(const char *newfile, int mval)
+void load_MarkovData(const char *newfile)
 {
     string fname(newfile);
-    if(mval == 0) {
-        myMarkovChain->LoadTextIntoVectorByChar(fname);
-    } else {
-        myMarkovChain->LoadTextIntoVector(fname);
-    }
-    
+    myMarkovChain->LoadTextIntoVector(fname);
+    //myMarkovChain->LoadTextFromWordsToLetters();
 }
 
 void loadMarkov_cb(Fl_Widget*, void*v)
 {
-    EditorWindow* e = (EditorWindow*)v;
     Fl_Native_File_Chooser fnfc;
     fnfc.title("Load Text for Markov Chain");
     fnfc.type(Fl_Native_File_Chooser::BROWSE_FILE);
     if ( fnfc.show() ) return;
-    load_MarkovData(fnfc.filename(),e->markovMode->value());
+    load_MarkovData(fnfc.filename());
     
+}
+
+void gen_SetChaosMap(void *v)
+{
+    EditorWindow* e = (EditorWindow*)v;
+    myMarkovChain->setUseChaosMap(true);
+    myMarkovChain->setParBegin(e->parBegin->value());
+    myMarkovChain->setParEnd(e->parEnd->value());
+    myMarkovChain->setItr(1000);
+    myMarkovChain->setMpar(4.9);
+    myMarkovChain->setX(e->seedValue->value());
+    myMarkovChain->setKit(myMarkovChain->getItr()-(int)e->keepItr->value());
+    myMarkovChain->setSteps(atoi(e->numberOfWords->value()));
+    printf("CM: %f %f %f\n",myMarkovChain->getParBegin(),myMarkovChain->getParEnd(),myMarkovChain->getX());
+}
+
+void gen_SetupDistrib(void *v)
+{
+    EditorWindow* e = (EditorWindow*)v;
+    switch (e->markovDist->value()) {
+        case 0:
+            myMarkovChain->setUseChaosMap(false);
+            break;
+        case 1:
+            gen_SetChaosMap(v);
+            myMarkovChain->setMyMapType(LOG);
+            break;
+        case 2:
+            gen_SetChaosMap(v);
+            myMarkovChain->setMyMapType(EXP);
+            break;
+        case 3:
+            gen_SetChaosMap(v);
+            myMarkovChain->setMyMapType(MOUSE);
+            break;
+        default:
+            break;
+    }
 }
 
 void gen_SetUpMarkovChain(void *v)
 {
     EditorWindow* e = (EditorWindow*)v;
+    newGen = true;
+    gen_SetupDistrib(v);
     if(e->markovMode->value() == 0) {
         myMarkovChain->SetupCharMarkovChain();
         myMarkovChain->setMarkovMode(BY_CHAR);
@@ -499,6 +549,107 @@ void gen_GetNextMarkovChain()
     }
 }
 
+void gen_SetMaxNumWords(void *v)
+{
+    EditorWindow* e = (EditorWindow*)v;
+    maxWordsPerLine = (e->aprxWords->value() == 1) ? e->wordsPerLine->value() + floor((float)rand()/RAND_MAX*e->wordsPerLine->value()) :
+    e->wordsPerLine->value();
+}
+
+void gen_SetMaxNumLines(void *v)
+{
+    EditorWindow* e = (EditorWindow*)v;
+    maxLinesPerParagraph = (e->aprxLines->value() == 1) ? e->linesPerParagraph->value() + floor((float)rand()/RAND_MAX*e->linesPerParagraph->value()) :
+    e->linesPerParagraph->value();
+
+}
+
+
+void gen_ProcessTextByChar(int num, void *v)
+{
+    
+    textbuf->append(myMarkovChain->GetFirstWord().c_str());
+    if(myMarkovChain->getUseChaosMap())
+        num = num * (myMarkovChain->getItr()-myMarkovChain->getKit());
+    for(int i=0; i<num; i++) {
+        gen_GetNextMarkovChain();
+        char *fs = &myMarkovChain->GetFoundWord().at(myMarkovChain->GetFoundWord().size()-1);
+        textbuf->append(myMarkovChain->GetFoundWord().c_str());
+        nWordsPerLine++;
+        //for by char mode try to see if we are ending on a space or punctuation, so that
+        //we end on a word or end of sentence (may need to look into further)
+        if(nWordsPerLine >= maxWordsPerLine && isspace(*fs)) {
+            textbuf->append("\n");
+            nWordsPerLine = 0;
+            gen_SetMaxNumWords(v);
+            nLinesPerParagraph++;
+        }
+        if(nLinesPerParagraph == maxLinesPerParagraph) {
+            textbuf->append("\n");
+            textbuf->append("\n");
+            //textbuf->append("\t");
+            gen_SetMaxNumWords(v);
+            gen_SetMaxNumLines(v);
+            nLinesPerParagraph = 0;
+            nWordsPerLine = 0;
+        }
+        
+    }
+}
+
+void gen_ProcessTextByWord(int num, void *v)
+{
+    printf("TEXTBYWORD: %s\n",myMarkovChain->GetFirstWord().c_str());
+    textbuf->append(myMarkovChain->GetFirstWord().c_str());
+    textbuf->append(" ");
+    if(myMarkovChain->getUseChaosMap())
+        num = num * (myMarkovChain->getItr()-myMarkovChain->getKit());
+
+    for(int i=0; i<num; i++) {
+        gen_GetNextMarkovChain();
+      
+        //append word and a space to the text buffer
+        textbuf->append(myMarkovChain->GetFoundWord().c_str());
+        textbuf->append(" ");
+        nWordsPerLine++;
+        //for by char mode try to see if we are ending on a space or punctuation, so that
+        //we end on a word or end of sentence (may need to look into further)
+        if(nWordsPerLine == maxWordsPerLine) {
+            textbuf->append("\n");
+            nWordsPerLine = 0;
+            gen_SetMaxNumWords(v);
+            nLinesPerParagraph++;
+        }
+        if(nLinesPerParagraph == maxLinesPerParagraph) {
+            textbuf->append("\n");
+            textbuf->append("\n");
+            //textbuf->append("\t");
+            gen_SetMaxNumWords(v);
+            gen_SetMaxNumLines(v);
+            nLinesPerParagraph = 0;
+            nWordsPerLine = 0;
+        }
+    }
+
+}
+
+void gen_GenerateText(int num, void* v)
+{
+    switch (myMarkovChain->getMarkovMode()) {
+        case BY_CHAR:
+            gen_ProcessTextByChar(num,v);
+            break;
+        case BY_NWORD:
+            gen_ProcessTextByWord(num,v);
+            break;
+        case BY_WORD:
+            gen_ProcessTextByWord(num,v);
+            break;
+        default:
+            break;
+    }
+}
+
 void genText_cb(Fl_Widget* w, void* v)
 {
     EditorWindow* e = (EditorWindow*)v;
@@ -508,77 +659,18 @@ void genText_cb(Fl_Widget* w, void* v)
     myMarkovChain->setNumLevels(e->nLevelSlider->value());
     if(!myMarkovChain->getChainIsReady()) {
         gen_SetUpMarkovChain(v);
-        maxWordsPerLine = e->wordsPerLine->value() + floor((float)rand()/RAND_MAX*e->wordsPerLine->value());
-        maxLinesPerParagraph = e->linesPerParagraph->value() + floor((float)rand()/RAND_MAX*e->linesPerParagraph->value());
-        printf("MAX: %d %d %f\n",maxWordsPerLine,maxLinesPerParagraph,(float)rand()/RAND_MAX);
-    } else {
+        gen_SetMaxNumWords(v);
+        gen_SetMaxNumLines(v);
+     } else {
         textbuf->text("");
         gen_ClearMarkovChain();
         gen_SetUpMarkovChain(v);
-        
         nWordsPerLine = 0;
         nLinesPerParagraph = 0;
-        maxWordsPerLine = e->wordsPerLine->value() + floor((float)rand()/RAND_MAX*e->wordsPerLine->value());
-        maxLinesPerParagraph = e->linesPerParagraph->value() + floor((float)rand()/RAND_MAX*e->linesPerParagraph->value());
-
+        gen_SetMaxNumWords(v);
+        gen_SetMaxNumLines(v);
     }
-    for(int i=0; i<num; i++) {
-        // printf("%s\n",myMarkovChain->GetFoundWord().c_str());
-        gen_GetNextMarkovChain();
-        if(nWordsPerLine >= maxWordsPerLine) {
-            textbuf->append("\n");
-            nWordsPerLine = 0;
-            maxWordsPerLine = e->wordsPerLine->value() + floor((float)rand()/RAND_MAX*e->wordsPerLine->value());
-            nLinesPerParagraph++;
-        }
-        if(nLinesPerParagraph >= maxLinesPerParagraph) {
-            textbuf->append("\n");
-            textbuf->append("\n");
-            //textbuf->append("\t");
-            maxLinesPerParagraph = e->linesPerParagraph->value() + floor((float)rand()/RAND_MAX*e->linesPerParagraph->value());
-            nLinesPerParagraph = 0;
-            nWordsPerLine = 0;
-        }
-        //textbuf->append(" ");
-        textbuf->append(myMarkovChain->GetFoundWord().c_str());
-        nWordsPerLine++;
-
-        
-        //make paragraphs only if ending on punctuation
-       // if(nLinesPerParagraph  >= maxLinesPerParagraph) {
-         //   textbuf->append("\n");
-         //   textbuf->append("\t");
-          //  maxLinesPerParagraph = e->linesPerParagraph->value() + floor((float)rand()/RAND_MAX*e->linesPerParagraph->value());
-          //  nLinesPerParagraph = 0;
-       // }
-
-        /*if(ispunct(myMarkovChain->GetFoundWord().c_str()[0])) {
-            textbuf->append(myMarkovChain->GetFoundWord().c_str());
-            if(nWordsPerLine >= maxWordsPerLine) {
-                textbuf->append("\n");
-                nWordsPerLine = 0;
-                maxWordsPerLine = e->wordsPerLine->value() + floor((float)rand()/RAND_MAX*e->wordsPerLine->value());
-                nLinesPerParagraph++;
-                
-            }
-            if(nLinesPerParagraph  >= maxLinesPerParagraph) {
-                textbuf->append("\n");
-                textbuf->append("\n");
-                textbuf->append("\t");
-                maxLinesPerParagraph = e->linesPerParagraph->value() + floor((float)rand()/RAND_MAX*e->linesPerParagraph->value());
-                nLinesPerParagraph = 0;
-                nWordsPerLine = 0;
-            } else {
-                nWordsPerLine++;
-            }
-        } else {
-            textbuf->append(" ");
-            textbuf->append(myMarkovChain->GetFoundWord().c_str());
-            nWordsPerLine++;
-        }*/
-        
-    }
-    
+    gen_GenerateText(num, v);
 }
 
 Fl_Menu_Item menuitems[] = {
@@ -618,6 +710,59 @@ Fl_Menu_Item menuitems[] = {
     
     { 0 }
 };
+
+void distribution_cb(Fl_Widget *w, void *v)
+{
+    EditorWindow *e = (EditorWindow *)v;
+    if(e->markovDist->value() == 0) {
+        e->parBegin->hide();
+        e->parEnd->hide();
+        e->keepItr->hide();
+        e->seedValue->hide();
+    }
+    if(e->markovDist->value() == 1) {
+        e->parBegin->bounds(2.0, 4.0);
+        e->parBegin->step(0.1);
+        e->parBegin->value(2.8);
+        e->parBegin->show();
+        e->parEnd->bounds(2.0, 4.0);
+        e->parEnd->step(0.1);
+        e->parEnd->value(4.0);
+        e->parEnd->show();
+        e->seedValue->value(0.1);
+        e->seedValue->show();
+        e->keepItr->value(1);
+        e->keepItr->show();
+    }
+    if(e->markovDist->value() == 2) {
+        e->parBegin->bounds(0.57, 0.135);
+        e->parBegin->step(-0.05);
+        e->parBegin->value(0.57);
+        e->parBegin->show();
+        e->parEnd->bounds(0.57, 0.135);
+        e->parEnd->step(-0.05);
+        e->parEnd->value(0.135);
+        e->parEnd->show();
+        e->seedValue->value(0.1);
+        e->seedValue->show();
+        e->keepItr->value(1);
+        e->keepItr->show();
+    }
+    if(e->markovDist->value() == 3) {
+        e->parBegin->bounds(-1.0, 1.0);
+        e->parBegin->step(0.1);
+        e->parBegin->value(-0.75);
+        e->parBegin->show();
+        e->parEnd->bounds(-1.0, 1.0);
+        e->parEnd->step(0.1);
+        e->parEnd->value(0.75);
+        e->parEnd->show();
+        e->seedValue->value(0.1);
+        e->seedValue->show();
+        e->keepItr->value(1);
+        e->keepItr->show();
+    }
+}
 
 Fl_Window* new_view() {
     EditorWindow* w = new EditorWindow(1024, 768, title);
@@ -669,8 +814,34 @@ Fl_Window* new_view() {
     w->markovMode->add("BY_NWORD");
     w->markovMode->value(0);
     
+    w->markovDist = new Fl_Choice(300,700,120, 30, "&Distribution");
+    w->markovDist->labelsize(10);
+    w->markovDist->align(FL_ALIGN_TOP);
+    w->markovDist->labelfont(FL_BOLD);
+    w->markovDist->add("RANDOM");
+    w->markovDist->add("LOGISTIC MAP");
+    w->markovDist->add("EXPONENTIAL MAP");
+    w->markovDist->add("MOUSE MAP");
+    w->markovDist->callback((Fl_Callback *)distribution_cb, w);
+    w->markovDist->value(0);
+    
+    //randomize word/line counts
+    w->aprxWords = new Fl_Check_Button(440,650,15, 30, "Rnd");
+    w->aprxWords->type(FL_TOGGLE_BUTTON);
+    w->aprxWords->labelsize(10);
+    w->aprxWords->align(FL_ALIGN_TOP);
+    w->aprxWords->labelfont(FL_BOLD);
+    
+    
+    w->aprxLines = new Fl_Check_Button(440,700,15, 30, "Rnd");
+    w->aprxLines->type(FL_TOGGLE_BUTTON);
+    w->aprxLines->labelsize(10);
+    w->aprxLines->align(FL_ALIGN_TOP);
+    w->aprxLines->labelfont(FL_BOLD);
+
+    
     //words per line slider
-    w->wordsPerLine = new Fl_Value_Slider(440,650,120, 30, "Words Per Line");
+    w->wordsPerLine = new Fl_Value_Slider(475,650,120, 30, "Words Per Line");
     w->wordsPerLine->type(FL_HOR_NICE_SLIDER);
     w->wordsPerLine->step(1);
     w->wordsPerLine->value(15);
@@ -679,7 +850,7 @@ Fl_Window* new_view() {
     w->wordsPerLine->labelfont(FL_BOLD);
     w->wordsPerLine->align(FL_ALIGN_TOP);
     
-    w->linesPerParagraph = new Fl_Value_Slider(440,700,120, 30, "Lines Per Paragraph");
+    w->linesPerParagraph = new Fl_Value_Slider(475,700,120, 30, "Lines Per Paragraph");
     w->linesPerParagraph->type(FL_HOR_NICE_SLIDER);
     w->linesPerParagraph->step(1);
     w->linesPerParagraph->value(15);
@@ -688,7 +859,42 @@ Fl_Window* new_view() {
     w->linesPerParagraph->labelfont(FL_BOLD);
     w->linesPerParagraph->align(FL_ALIGN_TOP);
 
+    //chaos map parameter sliders
+    w->parBegin = new Fl_Value_Slider(615, 650, 120 , 30, "Par Begin");
+    w->parBegin->type(FL_HOR_NICE_SLIDER);
+    w->parBegin->labelsize(10);
+    w->parBegin->labelfont(FL_BOLD);
+    w->parBegin->align(FL_ALIGN_TOP);
+    w->parBegin->hide();
     
+    w->parEnd = new Fl_Value_Slider(615, 700, 120 , 30, "Par End");
+    w->parEnd->type(FL_HOR_NICE_SLIDER);
+    w->parEnd->labelsize(10);
+    w->parEnd->labelfont(FL_BOLD);
+    w->parEnd->align(FL_ALIGN_TOP);
+    w->parEnd->hide();
+    
+    w->seedValue = new Fl_Value_Slider(755, 650, 120 ,30, "Seed Value");
+    w->seedValue->type(FL_HOR_NICE_SLIDER);
+    w->seedValue->step(0.025);
+    w->seedValue->value(0.1);
+    w->seedValue->bounds(0.0, 1.0);
+    w->seedValue->labelsize(10);
+    w->seedValue->labelfont(FL_BOLD);
+    w->seedValue->align(FL_ALIGN_TOP);
+    w->seedValue->hide();
+
+    w->keepItr = new Fl_Value_Slider(755, 700, 120 ,30, "Keep Iter");
+    w->keepItr->type(FL_HOR_NICE_SLIDER);
+    w->keepItr->step(1);
+    w->keepItr->value(1);
+    w->keepItr->bounds(1, 50);
+    w->keepItr->labelsize(10);
+    w->keepItr->labelfont(FL_BOLD);
+    w->keepItr->align(FL_ALIGN_TOP);
+    w->keepItr->hide();
+
+
     w->end();
     w->resizable(w->editor);
     w->size_range(300,200);

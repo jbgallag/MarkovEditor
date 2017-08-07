@@ -18,6 +18,13 @@ ChaosMap::ChaosMap(double bpar, double epar, double initX, int nsteps, int iter,
     yMin = 9999.0;
 }
 
+ChaosMap::~ChaosMap()
+{
+    coordMap.clear();
+    myLogMap.clear();
+    periodMap.clear();
+}
+
 void ChaosMap::Run()
 {
 
