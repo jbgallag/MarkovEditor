@@ -24,6 +24,15 @@
 
 using namespace std;
 
+typedef map<string,float> wordMap;
+typedef map<float,string> rWordMap;
+typedef map<int,wordMap> levelMap;
+typedef map<int,rWordMap> rLevelMap;
+typedef map<string,wordMap> markovChain;
+typedef map<string,rWordMap> markovRChain;
+typedef map<string,levelMap> markovChainNLevel;
+typedef map<string,rLevelMap> markovProbChainNLevel;
+
 enum MarkovMode {BY_WORD = 0 , BY_NWORD, BY_CHAR};
 
 class MarkovWordChain
@@ -48,11 +57,11 @@ public:
     string GetFirstWord();
     
     
-    void GetNextProbChain();
+    bool GetNextProbChain();
     void GetNextWordInProbChain();
-    void GetNextNLevelProbChain();
+    bool GetNextNLevelProbChain();
     void GetNextWordInNLevelProbChain();
-    void GetNextProbChainByChar();
+    bool GetNextProbChainByChar();
     void GetNextStrInProbChainByChar();
     
     float GetProbability();
@@ -64,6 +73,12 @@ public:
     
     void SetKeyWord();
     void SetNextWord();
+    
+    float GetNextWordCount(string bwrd, string wrd);
+    float GetNextWordPerc(string bwrd, string wrd);
+    float GetBaseWordSum(string wrd);
+    
+    void SetWordMapPointer(string word);
     //inlines
     inline void setUseChaosMap(bool uch) { useChaosMap = uch;}
     inline bool getUseChaosMap() { return useChaosMap;}
@@ -95,21 +110,14 @@ public:
     inline void setFirstRun(bool fr) { firstRun = fr;}
     inline bool getFirstRun() { return firstRun;}
     
-    
+    wordMap *wMapPointer;
 private:
-    typedef map<string,float> wordMap;
-    typedef map<float,string> rWordMap;
-    typedef map<int,wordMap> levelMap;
-    typedef map<int,rWordMap> rLevelMap;
-    typedef map<string,wordMap> markovChain;
-    typedef map<string,rWordMap> markovRChain;
-    typedef map<string,levelMap> markovChainNLevel;
-    typedef map<string,rLevelMap> markovProbChainNLevel;
     vector<string> Words;
     vector<string> Letters;
     
     //by words cumulative string or by char
     markovChain myMarkovChain;
+    markovChain myMarkovChainCopy;
     markovRChain myProbChain;
     
     //by words N-Words-Away
@@ -118,6 +126,7 @@ private:
     
     int nlevels,curlevel;
     markovChain::iterator itMrk;
+    markovChain::iterator itMrkCp;
     markovRChain::iterator itRMrk;
     markovChain::iterator itMrkActive;
     
@@ -129,7 +138,7 @@ private:
     mapType  myMtype;
     float parBegin,parEnd,x,mpar;
     int steps,itr,kit,mtype;
-    bool useChaosMap,firstRun;
+    bool useChaosMap,firstRun,firstWordInChain;
     logMap::iterator parItr;
     vector<double>::iterator probItr;
     

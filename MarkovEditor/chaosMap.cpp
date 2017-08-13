@@ -60,6 +60,7 @@ void ChaosMap::ComputeIterates()
    double y;
    m_istep = (myEPar-myBPar)/myNSteps;
    for(int i=0; i<myNSteps; i++) {
+       x = myX;
 	m_a = myBPar + (m_istep*i);
 	for(int k=0; k<myIter; k++) {
 	  y = GetY(x); 

@@ -26,6 +26,7 @@ MarkovWordChain::MarkovWordChain()
 {
     firstRun = true;
     chainIsReady = false;
+    firstWordInChain = true;
     mmode = BY_CHAR;
     curlevel = 1;
     srand((unsigned int)time(NULL));
@@ -35,6 +36,7 @@ MarkovWordChain::MarkovWordChain(string fname, string seedWord, int numLevels,fl
 {
     useChaosMap = true;
     firstRun = true;
+    firstWordInChain = true;
     nlevels = numLevels;
     setMyMtype(mt);
     LoadTextIntoVector(fname);
@@ -70,6 +72,7 @@ void MarkovWordChain::SetupMarkovChain()
     if(getUseChaosMap())
         LoadChaosMap(parBegin,parEnd,x,steps,itr,kit,mpar,myMtype);
     chainIsReady = true;
+    firstWordInChain = true;
     firstRun = true;
 }
 
@@ -80,6 +83,7 @@ void MarkovWordChain::SetupCharMarkovChain()
     if(getUseChaosMap())
         LoadChaosMap(parBegin,parEnd,x,steps,itr,kit,mpar,myMtype);
     chainIsReady = true;
+    firstWordInChain = true;
     firstRun = true;
 }
 
@@ -114,6 +118,7 @@ void MarkovWordChain::SetupNLevelMarkovChain()
     if(getUseChaosMap())
         LoadChaosMap(parBegin,parEnd,x,steps,itr,kit,mpar,myMtype);
     chainIsReady = true;
+    firstWordInChain = true;
     firstRun = true;
 }
 
@@ -257,18 +262,25 @@ void MarkovWordChain::CreateMarkovWordChain()
                 activeString.append(Words[j+k]);
             }
             itMrk = myMarkovChain.find(activeString);
+            itMrkCp = myMarkovChainCopy.find(activeString);
+            
             if(itMrk == myMarkovChain.end()) {
                 wordMap *aWordMap = new wordMap;
                 aWordMap->insert(std::pair<string,float>(Words[j+clevel],1.0));
                 myMarkovChain.insert(std::pair<string,wordMap>(activeString,*aWordMap));
+                myMarkovChainCopy.insert(std::pair<string,wordMap>(activeString,*aWordMap));
                 delete aWordMap;
             } else {
                 wordMap::iterator itMM = itMrk->second.find(Words[j+clevel]);
+                wordMap::iterator itMMCp = itMrkCp->second.find(Words[j+clevel]);
                 if(itMM == itMrk->second.end()) {
                     wordMap *aWordMap = &itMrk->second;
                     aWordMap->insert(std::pair<string,float>(Words[j+clevel],1.0));
+                    wordMap *aWordMapCp = &itMrkCp->second;
+                    aWordMapCp->insert(std::pair<string,float>(Words[j+clevel],1.0));
                 } else {
                     itMM->second = itMM->second + 1.0;
+                    itMMCp->second = itMMCp->second + 1.0;
                 }
             }
         }
@@ -290,8 +302,8 @@ void MarkovWordChain::CreateMarkovCharChain()
         for(int j=0; j<nlevels; j++) {
             nextString.append(Letters[i+nlevels+j]);
         }
-    //    printf("keyString: %s string: %s\n",keyString.c_str(),nextString.c_str());
         itMrk = myMarkovChain.find(keyString);
+  
         if(itMrk == myMarkovChain.end()) {
             wordMap *aWordMap = new wordMap;
             aWordMap->insert(std::pair<string,float>(nextString,1.0));
@@ -313,6 +325,7 @@ void MarkovWordChain::CreateMarkovCharChain()
 
 void MarkovWordChain::ComputeNLevelProbabilities()
 {
+    
     for(markovChainNLevel::iterator itNL = myMarkovChainNLevel.begin(); itNL != myMarkovChainNLevel.end(); itNL++) {
         for(levelMap::iterator itLM = itNL->second.begin(); itLM != itNL->second.end(); itLM++) {
             float sum = 0.0;
@@ -444,53 +457,69 @@ float MarkovWordChain::GetProbability()
     return rnum;
 }
 
-void MarkovWordChain::GetNextProbChain()
+bool MarkovWordChain::GetNextProbChain()
 {
     //this function sets the iterator in the markov chain
     //which will point to a map of words as keys with probabilities as values
     //if this is multi-level and the end of the chain, the last
     //word in firstWord, is parsed out and used to start a new first
     //level chain
+    bool foundLinkInChain;
     itRMrk = myProbChain.find(firstWord);
-    if(itRMrk == myProbChain.end()) {
-        vector<string> splitWords = splitString(firstWord, " ");
-        int idx = (int)splitWords.size()-1;
-        itRMrk = myProbChain.find(splitWords[idx]);
-        firstWord.clear();
-        firstWord = splitWords[idx];
+    if(itRMrk == myProbChain.end() && firstWordInChain) {
+        foundLinkInChain = false;
+    } else {
+        if(itRMrk == myProbChain.end()) {
+            vector<string> splitWords = splitString(firstWord, " ");
+            int idx = (int)splitWords.size()-1;
+            itRMrk = myProbChain.find(splitWords[idx]);
+            firstWord.clear();
+            firstWord = splitWords[idx];
+        }
+        firstWordInChain = false;
+        foundLinkInChain = true;
     }
+    return foundLinkInChain;
  }
 
-void MarkovWordChain::GetNextProbChainByChar()
+bool MarkovWordChain::GetNextProbChainByChar()
 {
+    bool foundLinkInChain;
     itRMrk = myProbChain.find(firstWord);
-    if(itRMrk == myProbChain.end()) {
-        printf("First Word: %s not FOUND First word size: %lu!\n",firstWord.c_str(),firstWord.size());
-        for(markovRChain::iterator itM = myProbChain.begin(); itM != myProbChain.end(); itM++) {
-            printf("WORD: %s mapSIze: %lu\n",itM->first.c_str(),itM->second.size());
-        }
+    if(itRMrk == myProbChain.end() && firstWordInChain) {
+        foundLinkInChain = false;
+    } else {
+        firstWordInChain = false;
+        foundLinkInChain = true;
     }
+    return foundLinkInChain;
 }
 
-void MarkovWordChain::GetNextNLevelProbChain()
+bool MarkovWordChain::GetNextNLevelProbChain()
 {
-    
+    bool foundLinkInChain;
     if(curlevel == 1) {
         itNRMrk = myProbChainNLevel.find(firstWord);
        
     }
     
-    itRLvl = itNRMrk->second.find(curlevel);
+    if(itNRMrk == myProbChainNLevel.end() && firstWordInChain) {
+        foundLinkInChain = false;
+    } else {
+        itRLvl = itNRMrk->second.find(curlevel);
     
-    curlevel = curlevel+1;
+        curlevel = curlevel+1;
     
-    if(curlevel == nlevels+1) {
-        curlevel = 1;
+        if(curlevel == nlevels+1) {
+            curlevel = 1;
         
+        }
+        foundLinkInChain = true;
+        firstWordInChain = false;
     }
     
     printf("Currentl Level is %d wmap size is %lu\n",curlevel,itRLvl->second.size());
-    
+    return foundLinkInChain;
 }
 
 
@@ -537,7 +566,6 @@ void MarkovWordChain::GetNextWordInNLevelProbChain()
     
     rnum = GetProbability();
     for(rWordMap::iterator itMM = itRLvl->second.begin(); itMM != itRLvl->second.end(); itMM++) {
-        printf("%s %f %f %f\n",itMM->second.c_str(),itMM->first,prevProb,rnum);
         if(rnum > prevProb && rnum < itMM->first) {
             foundWord.clear();
             foundWord.append(itMM->second);
@@ -546,6 +574,12 @@ void MarkovWordChain::GetNextWordInNLevelProbChain()
         }
         prevProb = itMM->first;
     }
+}
+
+void MarkovWordChain::SetWordMapPointer(string word)
+{
+    markovChain::iterator itCh = myMarkovChain.find(word);
+    wMapPointer = &itCh->second;
 }
 
 string MarkovWordChain::GetFoundWord()
@@ -558,3 +592,40 @@ string MarkovWordChain::GetFirstWord()
     return firstWord;
 }
 
+float MarkovWordChain::GetNextWordCount(string bwrd, string wrd)
+{
+    float count = 0.0;
+    itMrkCp = myMarkovChainCopy.find(bwrd);
+    if(itMrkCp != myMarkovChainCopy.end()) {
+        wordMap::iterator itM = itMrkCp->second.find(wrd);
+        if(itM != itMrkCp->second.end()) {
+            count = itM->second;
+        }
+    }
+    return count;
+}
+
+float MarkovWordChain::GetNextWordPerc(string bwrd, string wrd)
+{
+    float perc = 0.0;
+    itMrk = myMarkovChain.find(bwrd);
+    if(itMrk != myMarkovChain.end()) {
+        wordMap::iterator itM = itMrk->second.find(wrd);
+        if(itM != itMrk->second.end()) {
+            perc = itM->second;
+        }
+    }
+    return perc;
+}
+
+float MarkovWordChain::GetBaseWordSum(string wrd)
+{
+    float sum = 0.0;
+    itMrkCp = myMarkovChainCopy.find(wrd);
+    if(itMrkCp != myMarkovChainCopy.end()) {
+        for(wordMap::iterator itM = itMrkCp->second.begin(); itM != itMrkCp->second.end(); itM++) {
+            sum = sum + itM->second;
+        }
+    }
+    return sum;
+}
