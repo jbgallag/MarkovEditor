@@ -33,7 +33,7 @@ typedef map<string,rWordMap> markovRChain;
 typedef map<string,levelMap> markovChainNLevel;
 typedef map<string,rLevelMap> markovProbChainNLevel;
 
-enum MarkovMode {BY_WORD = 0 , BY_NWORD, BY_CHAR};
+enum MarkovMode {BY_WORD = 0 , BY_NWORD, BY_CHAR, BY_NCHAR};
 
 class MarkovWordChain
 {
@@ -46,6 +46,7 @@ public:
     void CreateNLevelMarkovChain();
     void ComputeNLevelProbabilities();
     void CreateMarkovCharChain();
+    void CreateMarkovCharNChain();
     
     void LoadChaosMap(float parBegin, float parEnd, float x,int steps,int itr,int kit,float mpar,mapType mpType);
     void setMyMtype(int mt);
@@ -63,11 +64,14 @@ public:
     void GetNextWordInNLevelProbChain();
     bool GetNextProbChainByChar();
     void GetNextStrInProbChainByChar();
+    bool GetNextProbChainByNChar();
+    void GetNextStrInProbChainByNChar();
     
     float GetProbability();
     void ClearMarkovChain();
     void SetupMarkovChain();
     void SetupCharMarkovChain();
+    void SetupNCharMarkovChain();
     void ClearNLevelMarkovChain();
     void SetupNLevelMarkovChain();
     

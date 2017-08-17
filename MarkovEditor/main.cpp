@@ -62,9 +62,11 @@ Fl_Output *nextWord;
 Fl_Output *nextCount;
 Fl_Output *nextPerc;
 Fl_Button *wcOk;
+Fl_Button *wcCancel;
 
 int maxWidth = 800;
 int maxHeight = 600;
+bool appendMode = false;
 int nWordsPerLine = 0;
 int nLinesPerParagraph = 0;
 int maxWordsPerLine;
@@ -519,17 +521,19 @@ void gen_SetUpMarkovChain(void *v)
     newGen = true;
     gen_SetupDistrib(v);
     if(e->markovMode->value() == 0) {
-        myMarkovChain->SetupCharMarkovChain();
-        myMarkovChain->setMarkovMode(BY_CHAR);
-    }
-    if(e->markovMode->value() == 1) {
         myMarkovChain->SetupMarkovChain();
         myMarkovChain->setMarkovMode(BY_WORD);
     }
-    if(e->markovMode->value() == 2) {
-        myMarkovChain->SetupNLevelMarkovChain();
-        myMarkovChain->setMarkovMode(BY_NWORD);
+    if(e->markovMode->value() == 1) {
+        myMarkovChain->SetupCharMarkovChain();
+        myMarkovChain->setMarkovMode(BY_CHAR);
     }
+    if(e->markovMode->value() == 2) {
+        myMarkovChain->SetupNCharMarkovChain();
+        myMarkovChain->setMarkovMode(BY_NCHAR);
+
+    }
+    printf("SETUP: markovMode: %d\n",myMarkovChain->getMarkovMode());
 }
 
 void gen_ClearMarkovChain()
@@ -544,7 +548,9 @@ void gen_ClearMarkovChain()
         case BY_NWORD:
             myMarkovChain->ClearNLevelMarkovChain();
             break;
-            
+        case BY_NCHAR:
+            myMarkovChain->ClearMarkovChain();
+            break;
         default:
             break;
     }
@@ -573,6 +579,14 @@ bool gen_GetNextMarkovChain()
         case BY_NWORD:
             if(myMarkovChain->GetNextNLevelProbChain()) {
                 myMarkovChain->GetNextWordInNLevelProbChain();
+                fw = true;
+            } else {
+                fw = false;
+            }
+            break;
+        case BY_NCHAR:
+            if(myMarkovChain->GetNextProbChainByNChar()) {
+                myMarkovChain->GetNextStrInProbChainByNChar();
                 fw = true;
             } else {
                 fw = false;
@@ -721,6 +735,9 @@ void gen_GenerateText(int num, void* v)
         case BY_WORD:
             gen_ProcessTextByWord(num,v);
             break;
+        case BY_NCHAR:
+            gen_ProcessTextByChar(num, v);
+            break;
         default:
             break;
     }
@@ -731,7 +748,7 @@ bool gen_setSeedWord(void *v)
     bool setSeedWord;
     string str;
     EditorWindow* e = (EditorWindow*)v;
-    if(e->markovMode->value() == 0) {
+    if(e->markovMode->value() == 1 || e->markovMode->value() == 2) {
         
         str.append(e->seedWord->value());
         
@@ -780,7 +797,7 @@ void genText_cb(Fl_Widget* w, void* v)
     }
 }
 
-void deleteWordChoiceObjetcs()
+void deleteWordChoiceObjects()
 {
     for(map<int,Fl_Button *>::iterator it = wordChoiceChecks.begin(); it != wordChoiceChecks.end(); it++) {
         delete it->second;
@@ -795,17 +812,29 @@ void deleteWordChoiceObjetcs()
     delete wordChoices;
 
     wordChoiceChecks.clear();
+    appendMode = false;
 }
 
 void wcOk_cb()
 {
     
     int nextStart,nextEnd = -1;
-    textbuf->secondary_selection_position(&nextStart, &nextEnd);
-    textbuf->replace(nextStart, nextEnd, "");
-    textbuf->insert(nextStart, nextWord->value());
-    deleteWordChoiceObjetcs();
+    if(!appendMode) {
+        textbuf->secondary_selection_position(&nextStart, &nextEnd);
+        textbuf->replace(nextStart, nextEnd, "");
+        textbuf->insert(nextStart, nextWord->value());
+    } else {
+        textbuf->selection_position(&nextStart, &nextEnd);
+        textbuf->insert(nextEnd+1, " ");
+        textbuf->insert(nextEnd+2, nextWord->value());
+    }
+    deleteWordChoiceObjects();
     
+}
+
+void wcCancel_cb()
+{
+    deleteWordChoiceObjects();
 }
 
 void wcRadio_cb()
@@ -825,13 +854,17 @@ void wcRadio_cb()
 }
 
 
-void wordChoices_cb(Fl_Widget*, void* v) {
-    EditorWindow* e = (EditorWindow*)v;
+void wordChoices_cb() {
+    int cols_size = 150;
+    int rows_size = 40;
+    int pad = 150;
     int rows,cols,leftover=0;
-    int nWidth,nHeight,wcWidth,wcHeight = 0;
+    int nWidth,nHeight = 0;
     int nextStart,nextEnd = -1;
     int baseStart,baseEnd = -1;
     int sel = -1;
+    
+    if(textbuf->selected()) {
     string selWord = textbuf->selection_text();
     sel = textbuf->selection_position(&baseStart, &baseEnd);
     
@@ -840,14 +873,20 @@ void wordChoices_cb(Fl_Widget*, void* v) {
     nextStart = baseEnd+1;
     while (notFoundNext) {
         textbuf->search_forward(nextStart, " ", &nextEnd);
+        printf("nextEnd: %d\n",nextEnd);
         fcnt++;
-        if(fcnt == 2)
+        if(fcnt == 2 || nextEnd == -1)
             notFoundNext = false;
         
     }
-    textbuf->secondary_select(nextStart, nextEnd);
-    textbuf->highlight(nextStart, nextEnd);
-    string nextText = textbuf->secondary_selection_text();
+    string nextText;
+    if(nextEnd != -1) {
+        textbuf->secondary_select(nextStart, nextEnd);
+        textbuf->highlight(nextStart, nextEnd);
+        nextText = textbuf->secondary_selection_text();
+    } else {
+        appendMode = true;
+    }
     myMarkovChain->SetWordMapPointer(selWord);
    // Fl_Choice *words = new Fl_Choice(150, 50, 120, 30, "Word Choices");
     printf("MAP SIZE: %lu %s\n",myMarkovChain->wMapPointer->size(),selWord.c_str());
@@ -860,18 +899,16 @@ void wordChoices_cb(Fl_Widget*, void* v) {
         rows = cols;
     }
     printf("ROWS-COLS %d %d %d\n", rows,cols,leftover);
-    nWidth = 100+(cols*130);
-    nHeight = 100+(rows*40);
-    if(nWidth > maxWidth || nHeight > maxHeight) {
-        wcWidth = 800;
-        wcHeight = 600;
-    } else {
-        wcWidth = nWidth;
-        wcHeight = nHeight;
-    }
+    nWidth = pad+(cols*cols_size);
+    nHeight = pad+(rows*rows_size);
+    printf("NWIDT: %d %d\n",nWidth,nHeight);
+    if(nWidth > maxWidth)
+        nWidth = 800;
+    if(nHeight > maxHeight)
+        nHeight = 600;
     
-    wordChoices = new Fl_Double_Window(wcWidth, wcHeight, "WordChoices");
-    wordChoiceScroll = new Fl_Scroll(0,0,wcWidth,wcHeight);
+    wordChoices = new Fl_Double_Window(nWidth, nHeight, "WordChoices");
+    wordChoiceScroll = new Fl_Scroll(0,0,nWidth,nHeight);
     wordChoiceScroll->box(FL_DOWN_FRAME);
     
     baseWord = new Fl_Output(10,30,120,30,"Base Word:");
@@ -912,15 +949,18 @@ void wordChoices_cb(Fl_Widget*, void* v) {
     
     wordMap::iterator itM = myMarkovChain->wMapPointer->begin();
     int c=0;
+    int xloc,yloc = 0;
     for(int i=0; i<cols; i++) {
         for(int j=0; j<rows; j++) {
             if(c < (int)myMarkovChain->wMapPointer->size()) {
-                Fl_Round_Button *wccb = new Fl_Round_Button(150+(j*130),75+(i*40), 30, 30, itM->first.c_str());
+                xloc = 150+(j*cols_size);
+                yloc = 75+(i*rows_size);
+                Fl_Round_Button *wccb = new Fl_Round_Button(xloc,yloc, 30, 30, itM->first.c_str());
                 wccb->type(FL_RADIO_BUTTON);
                 wccb->labelsize(16);
                 wccb->align(FL_ALIGN_LEFT);
                 wccb->labelfont(FL_BOLD);
-                wccb->callback((Fl_Callback *)wcRadio_cb, e);
+                wccb->callback((Fl_Callback *)wcRadio_cb);
                 itM++;
                 wordChoiceChecks[c] = wccb;
                 c++;
@@ -929,15 +969,20 @@ void wordChoices_cb(Fl_Widget*, void* v) {
     }
 
     
-    wcOk = new Fl_Return_Button(20, 50+(rows*40), 120, 30, "&Replace Word");
+    wcOk = new Fl_Return_Button(20, yloc+50, 120, 30, "&Replace Word");
     wcOk->labelsize(10);
     wcOk->labelfont(FL_BOLD);
-    wcOk->callback((Fl_Callback *)wcOk_cb, e);
+    wcOk->callback((Fl_Callback *)wcOk_cb);
     
+    wcCancel = new Fl_Return_Button(160, yloc+50, 120, 30, "&Cancel");
+    wcCancel->labelsize(10);
+    wcCancel->labelfont(FL_BOLD);
+    wcCancel->callback((Fl_Callback *)wcCancel_cb);
    
 
     wordChoices->end();
     wordChoices->show();
+    }
 
 }
 
@@ -1081,9 +1126,9 @@ Fl_Window* new_view() {
     w->markovMode->labelsize(10);
     w->markovMode->align(FL_ALIGN_TOP);
     w->markovMode->labelfont(FL_BOLD);
-    w->markovMode->add("BY_CHAR");
     w->markovMode->add("BY_WORD");
-    w->markovMode->add("BY_NWORD");
+    w->markovMode->add("BY_CHAR");
+    w->markovMode->add("BY_NCHAR");
     w->markovMode->value(0);
     
     w->markovDist = new Fl_Choice(300,700,120, 30, "&Distribution");
