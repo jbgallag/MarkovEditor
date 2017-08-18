@@ -33,7 +33,7 @@ typedef map<string,rWordMap> markovRChain;
 typedef map<string,levelMap> markovChainNLevel;
 typedef map<string,rLevelMap> markovProbChainNLevel;
 
-enum MarkovMode {BY_WORD = 0 , BY_NWORD, BY_CHAR, BY_NCHAR};
+enum MarkovMode {BY_WORD = 0 , BY_CHAR};
 
 class MarkovWordChain
 {
@@ -41,14 +41,15 @@ public:
     MarkovWordChain();
     MarkovWordChain(string fname, string seedWord, int numLevels,float parBegin, float parEnd, float x,int steps,int itr,int kit,float mpar,int mt);
     void CreateMarkovWordChain();
+    void CreateMarkovCharChain();
+    
     //compute probabilities is used for both by char and by cumulative words modes
     void ComputeProbabilities();
-    void CreateNLevelMarkovChain();
-    void ComputeNLevelProbabilities();
-    void CreateMarkovCharChain();
-    void CreateMarkovCharNChain();
     
     void LoadChaosMap(float parBegin, float parEnd, float x,int steps,int itr,int kit,float mpar,mapType mpType);
+    void LoadChaosMap();
+    void DeleteChaosMap();
+    
     void setMyMtype(int mt);
     void LoadTextIntoVector(string fname);
     void LoadTextIntoVectorByChar(string fname);
@@ -60,20 +61,13 @@ public:
     
     bool GetNextProbChain();
     void GetNextWordInProbChain();
-    bool GetNextNLevelProbChain();
-    void GetNextWordInNLevelProbChain();
     bool GetNextProbChainByChar();
     void GetNextStrInProbChainByChar();
-    bool GetNextProbChainByNChar();
-    void GetNextStrInProbChainByNChar();
     
     float GetProbability();
     void ClearMarkovChain();
     void SetupMarkovChain();
     void SetupCharMarkovChain();
-    void SetupNCharMarkovChain();
-    void ClearNLevelMarkovChain();
-    void SetupNLevelMarkovChain();
     
     void SetKeyWord();
     void SetNextWord();
@@ -113,6 +107,13 @@ public:
     inline int getMarkovMode() { return mmode;}
     inline void setFirstRun(bool fr) { firstRun = fr;}
     inline bool getFirstRun() { return firstRun;}
+    inline void setFirstWordInChain(bool fr) { firstWordInChain = fr;}
+    inline bool getFirstWordInChain() { return firstWordInChain;}
+
+    inline void setRemovePunc(bool rmpnc) { removePunc = rmpnc;}
+    inline bool getRemovePunc() { return removePunc;}
+    inline void setRemoveQuot(bool rmqt) { removeQuot = rmqt; }
+    inline bool getRemoveQuot() { return removeQuot;}
     
     wordMap *wMapPointer;
 private:
@@ -124,19 +125,12 @@ private:
     markovChain myMarkovChainCopy;
     markovRChain myProbChain;
     
-    //by words N-Words-Away
-    markovChainNLevel myMarkovChainNLevel;
-    markovProbChainNLevel myProbChainNLevel;
-    
-    int nlevels,curlevel;
+    int nlevels;
     markovChain::iterator itMrk;
     markovChain::iterator itMrkCp;
     markovRChain::iterator itRMrk;
     markovChain::iterator itMrkActive;
     
-    markovChainNLevel::iterator itNMrk;
-    markovProbChainNLevel::iterator itNRMrk;
-    rLevelMap::iterator itRLvl;
     //chaos stuff
     ChaosMap *myMap;
     mapType  myMtype;
@@ -150,10 +144,13 @@ private:
     string seedWord;
     string foundWord;
     string firstWord;
+    string lastFoundWord;
     
     string keyWord;
     string nextWord;
     bool chainIsReady;
+    bool removePunc;
+    bool removeQuot;
     
     //markov mode
     //cumulative token or N words away
