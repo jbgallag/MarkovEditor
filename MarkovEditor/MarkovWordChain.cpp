@@ -46,12 +46,27 @@ MarkovWordChain::MarkovWordChain(string fname, string seedWord, int numLevels,fl
     printf("MarkovChain: %s %s\n",fname.c_str(),firstWord.c_str());
 }
 
+void MarkovWordChain::ClearMarkovData()
+{
+    ClearMarkovChain();
+    if(useChaosMap)
+        DeleteChaosMap();
+    Letters.clear();
+    Words.clear();
+    Distribution.clear();
+}
+
 void MarkovWordChain::ClearMarkovChain()
 {
     for(markovChain::iterator chIt = myMarkovChain.begin(); chIt != myMarkovChain.end(); chIt++) {
         chIt->second.clear();
     }
     myMarkovChain.clear();
+    for(markovChain::iterator chIt = myMarkovChainCopy.begin(); chIt != myMarkovChainCopy.end(); chIt++) {
+        chIt->second.clear();
+    }
+    myMarkovChainCopy.clear();
+
     for(markovRChain::iterator chrIt = myProbChain.begin(); chrIt != myProbChain.end(); chrIt++) {
         chrIt->second.clear();
     }
@@ -123,6 +138,7 @@ void MarkovWordChain::LoadTextIntoVectorByChar(string fname)
     printf("Number of Chars: %lu\n",Words.size());
 }
 
+
 void MarkovWordChain::LoadTextIntoVector(string fname)
 {
     string aLine;
@@ -132,14 +148,71 @@ void MarkovWordChain::LoadTextIntoVector(string fname)
     regex rline("\\r+");
     regex nline("\\n+");
     regex quot("\"");
-
+    
+    regex ex("\\!");
+    regex at("\\@");
+    regex hs("\\#");
+    regex ds("\\$");
+    regex ps("\\%");
+    regex cs("\\^");
+    regex am("\\&");
+    regex ms("\\*");
+    regex lp("\\(");
+    regex rp("\\)");
+    regex pd("\\.");
+    regex cm("\\,");
+    regex qm("\\?");
+    regex smc("\\;");
+    regex cl("\\:");
+    regex bs("\\");
+    regex fs("\\/");
+    regex pls("\\+");
+    regex eqs("\\=");
+    regex rbr("\\[");
+    regex lbr("\\]");
+    regex rbbr("\\{");
+    regex lbbr ("\\}");
+    regex ltx("\\<");
+    regex gts("\\>");
+    
+   
     ifstream file(fname);
     if (!file) {
         cout << "unable to open file";
         exit(1);
     }
     while(getline(file,aLine)) {
-        aLine = regex_replace(aLine, quot, "");
+        if(getRemoveQuot()) {
+            aLine = regex_replace(aLine, quot, "");
+        }
+        if(getRemovePunc()) {
+            aLine = regex_replace(aLine, quot, "");
+            aLine = regex_replace(aLine, ex, "");
+            aLine = regex_replace(aLine, at, "");
+            aLine = regex_replace(aLine, hs, "");
+            aLine = regex_replace(aLine, ds, "");
+            aLine = regex_replace(aLine, ps, "");
+            aLine = regex_replace(aLine, cs, "");
+            aLine = regex_replace(aLine, am, "");
+            aLine = regex_replace(aLine, ms, "");
+           // aLine = regex_replace(aLine, lp, "");
+           // aLine = regex_replace(aLine, rp, "");
+            aLine = regex_replace(aLine, pd, "");
+            aLine = regex_replace(aLine, cm, "");
+            aLine = regex_replace(aLine, qm, "");
+            aLine = regex_replace(aLine, smc, "");
+            aLine = regex_replace(aLine, cl, "");
+            //aLine = regex_replace(aLine, bs, "");
+            //aLine = regex_replace(aLine, fs, "");
+            aLine = regex_replace(aLine, pls, "");
+            aLine = regex_replace(aLine, eqs, "");
+           // aLine = regex_replace(aLine, rbr, "");
+           // aLine = regex_replace(aLine, lbr, "");
+           // aLine = regex_replace(aLine, rbbr, "");
+           // aLine = regex_replace(aLine, lbbr, "");
+            aLine = regex_replace(aLine, ltx, "");
+            aLine = regex_replace(aLine, gts, "");
+        }
         aLine = regex_replace(aLine, tab, " ");
         aLine = regex_replace(aLine, nline, " ");
         aLine = regex_replace(aLine, rline, " ");
@@ -308,30 +381,121 @@ void MarkovWordChain::DeleteChaosMap()
     delete myMap;
 }
 
-float MarkovWordChain::GetProbability()
+void MarkovWordChain::MakeDistribution(int num, float f1, float f2)
 {
-    float rnum = 0.0;//((double) rand())/RAND_MAX;
-    if(useChaosMap) {
-        if(firstRun) {
-            firstRun = false;
-            parItr = myMap->coordMap.begin();
-            probItr = parItr->second.begin();
-        }  else {
-            probItr++;
-            if(probItr == parItr->second.end()) {
-                parItr++;
-                if(parItr == myMap->coordMap.end()) {
-                    parItr = myMap->coordMap.begin();
-                    probItr = parItr->second.begin();
-                } else {
-                    probItr = parItr->second.begin();
-                }
+    distribCount = 0;
+    if(Distribution.size() != 0)
+        Distribution.clear();
+    float rnum = 0.0;
+    if(getMarkovDist() == RANDOM) {
+        unsigned long seed = std::chrono::system_clock::now().time_since_epoch().count();
+        std::default_random_engine generator ((unsigned)seed);
+        std::uniform_real_distribution<float> rdist(f1,f2);
+        rdist.reset();
+        for(int i=0; i<num; i++) {
+            rnum = rdist(generator);
+            Distribution.push_back(rnum);
+        }
+
+    }
+    if(getMarkovDist() == LOGISTIC_MAP || getMarkovDist() == EXP_MAP || getMarkovDist() == MOUSE_MAP) {
+        LoadChaosMap();
+        for(logMap::iterator lmIt = myMap->coordMap.begin(); lmIt != myMap->coordMap.end(); lmIt++) {
+            for(vector<double>::iterator itV = lmIt->second.begin(); itV != lmIt->second.end(); itV++) {
+                Distribution.push_back(*itV);
             }
         }
-        rnum = *probItr;
-    } else {
-        rnum = (float)rand()/RAND_MAX;
     }
+    if(getMarkovDist() == NORMAL) {
+        unsigned long seed = std::chrono::system_clock::now().time_since_epoch().count();
+        std::default_random_engine generator ((unsigned)seed);
+        std::normal_distribution<float> ndist(f1,f2);
+        for(int i=0; i<num; i++) {
+            rnum = ndist(generator);
+            Distribution.push_back(rnum);
+        }
+        NormalizeDistribution();
+    }
+    if(getMarkovDist() == BINOMIAL) {
+        unsigned long seed = std::chrono::system_clock::now().time_since_epoch().count();
+        std::default_random_engine generator ((unsigned)seed);
+        std::binomial_distribution<int> bdist(f1,f2);
+        for(int i=0; i<num; i++) {
+            rnum = (float)bdist(generator);
+            Distribution.push_back(rnum);
+        }
+        NormalizeDistribution();
+    }
+    if(getMarkovDist() == EXPONENTIAL) {
+        unsigned long seed = std::chrono::system_clock::now().time_since_epoch().count();
+        std::default_random_engine generator ((unsigned)seed);
+        std::exponential_distribution<float> edist(f1);
+        for(int i=0; i<num; i++) {
+            rnum = edist(generator);
+            Distribution.push_back(rnum);
+        }
+        NormalizeDistribution();
+    }
+    if(getMarkovDist() == GEOMETRIC) {
+        unsigned long seed = std::chrono::system_clock::now().time_since_epoch().count();
+        std::default_random_engine generator ((unsigned)seed);
+        std::geometric_distribution<int> gdist(f1);
+        for(int i=0; i<num; i++) {
+            rnum = (float)gdist(generator);
+            Distribution.push_back(rnum);
+        }
+        NormalizeDistribution();
+    }
+    if(getMarkovDist() == LOGNORMAL) {
+        unsigned long seed = std::chrono::system_clock::now().time_since_epoch().count();
+        std::default_random_engine generator ((unsigned)seed);
+        std::lognormal_distribution<float> ldist(f1,f2);
+        for(int i=0; i<num; i++) {
+            rnum = ldist(generator);
+            Distribution.push_back(rnum);
+        }
+        NormalizeDistribution();
+    }
+
+    if(getMarkovDist() == POISSON) {
+        unsigned long seed = std::chrono::system_clock::now().time_since_epoch().count();
+        std::default_random_engine generator ((unsigned)seed);
+        std::poisson_distribution<int> pdist(f1);
+        for(int i=0; i<num; i++) {
+            rnum = (float)pdist(generator);
+            Distribution.push_back(rnum);
+        }
+        NormalizeDistribution();
+    }
+}
+
+void MarkovWordChain::NormalizeDistribution()
+{
+    float min = 9999.0;
+    float max = -9999.0;
+    //get min/max
+    for(int i=0; i<(int)Distribution.size(); i++) {
+        if(Distribution[i] < min)
+            min = Distribution[i];
+        if(Distribution[i] > max)
+            max = Distribution[i];
+    }
+    //normalize
+    for(int i=0; i<(int)Distribution.size(); i++) {
+        Distribution[i] = (Distribution[i] - min)/(max-min);
+    }
+    
+}
+
+float MarkovWordChain::GetProbability()
+{
+    float rnum = 0.0;
+    
+    rnum = Distribution[distribCount];
+    distribCount++;
+    
+    if(distribCount == (int)Distribution.size())
+        distribCount = 0;
 
     return rnum;
 }

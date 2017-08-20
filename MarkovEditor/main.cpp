@@ -131,6 +131,23 @@ public:
     Fl_Value_Slider *seedValue;
     Fl_Value_Slider *keepItr;
     
+    //sliders for other distribs
+    //binomial
+    Fl_Value_Slider *binomUpBnd;
+    Fl_Value_Slider *binomProb;
+    //exponential
+    Fl_Value_Slider *expLambda;
+    //geometric
+    Fl_Value_Slider *geomProb;
+    //normal
+    Fl_Value_Slider *normMean;
+    Fl_Value_Slider *normStdDev;
+    //lognormal
+    Fl_Value_Slider *logNormM;
+    Fl_Value_Slider *logNormS;
+    //poisson
+    Fl_Value_Slider *poisMean;
+    
     
     int			wrap_mode;
     int			line_numbers;
@@ -167,6 +184,22 @@ EditorWindow::~EditorWindow() {
     delete replace_dlg;
 }
 
+
+void findNextWordEndPosition(int *nextStart, int *nextEnd)
+{
+    bool notFoundNext = true;
+    int baseStart,baseEnd = -1;
+    int fcnt = 0;
+    textbuf->selection_position(&baseStart, &baseEnd);
+    *nextStart = baseEnd+1;
+    while (notFoundNext) {
+        textbuf->search_forward(*nextStart, " ", nextEnd);
+        fcnt++;
+        if(fcnt == 2 || *nextEnd == -1)
+            notFoundNext = false;
+        
+    }
+}
 
 int check_save(void) {
     if (!changed) return 1;
@@ -479,9 +512,27 @@ void loadMarkov_cb(Fl_Widget*, void*v)
     fnfc.title("Load Text for Markov Chain");
     fnfc.type(Fl_Native_File_Chooser::BROWSE_FILE);
     if ( fnfc.show() ) return;
+    //set punctuation removal bools from UI
+    if(e->removePunc->value() == 1)
+        myMarkovChain->setRemovePunc(true);
+    if(e->removeQuot->value() == 1)
+        myMarkovChain->setRemoveQuot(true);
+    if(e->removePunc->value() == 0)
+        myMarkovChain->setRemovePunc(false);
+    if(e->removeQuot->value() == 0)
+        myMarkovChain->setRemoveQuot(false);
+
     load_MarkovData(fnfc.filename());
     e->creMrkChn->activate();
     
+}
+
+void clearMarkov_cb(Fl_Widget*, void*v)
+{
+    EditorWindow *e = (EditorWindow *)v;
+    e->creMrkChn->deactivate();
+    e->genText->deactivate();
+    myMarkovChain->ClearMarkovData();
 }
 
 void gen_SetChaosMap(void *v)
@@ -497,34 +548,70 @@ void gen_SetChaosMap(void *v)
     myMarkovChain->setSteps(atoi(e->numberOfWords->value()));
 }
 
-void gen_SetupDistrib(void *v)
+void gen_SetupDistrib(int num, void *v)
 {
     EditorWindow* e = (EditorWindow*)v;
     switch (e->markovDist->value()) {
         case 0:
             myMarkovChain->setUseChaosMap(false);
+            myMarkovChain->setMarkovDist(RANDOM);
+            myMarkovChain->MakeDistribution(num, 0.0, 1.0);
             break;
         case 1:
+            myMarkovChain->setMarkovDist(LOGISTIC_MAP);
             if(myMarkovChain->getUseChaosMap())
                 myMarkovChain->DeleteChaosMap();
             gen_SetChaosMap(v);
             myMarkovChain->setMyMapType(LOG);
-            myMarkovChain->LoadChaosMap();
+            myMarkovChain->MakeDistribution(num, 0.0, 0.0);
             break;
         case 2:
+            myMarkovChain->setMarkovDist(EXP_MAP);
             if(myMarkovChain->getUseChaosMap())
                 myMarkovChain->DeleteChaosMap();
             gen_SetChaosMap(v);
             myMarkovChain->setMyMapType(EXP);
             myMarkovChain->LoadChaosMap();
+            myMarkovChain->MakeDistribution(num, 0.0, 0.0);
             break;
         case 3:
-            
+            myMarkovChain->setMarkovDist(MOUSE_MAP);
             if(myMarkovChain->getUseChaosMap())
                 myMarkovChain->DeleteChaosMap();
             gen_SetChaosMap(v);
             myMarkovChain->setMyMapType(MOUSE);
             myMarkovChain->LoadChaosMap();
+            myMarkovChain->MakeDistribution(num, 0.0, 0.0);
+            break;
+        case 4:
+            myMarkovChain->setUseChaosMap(false);
+            myMarkovChain->setMarkovDist(NORMAL);
+            myMarkovChain->MakeDistribution(num, e->normMean->value(), e->normStdDev->value());
+            break;
+        case 5:
+            myMarkovChain->setUseChaosMap(false);
+            myMarkovChain->setMarkovDist(BINOMIAL);
+            myMarkovChain->MakeDistribution(num, e->binomUpBnd->value(), e->binomProb->value());
+            break;
+        case 6:
+            myMarkovChain->setUseChaosMap(false);
+            myMarkovChain->setMarkovDist(EXPONENTIAL);
+            myMarkovChain->MakeDistribution(num, e->expLambda->value(), 0.0);
+            break;
+        case 7:
+            myMarkovChain->setUseChaosMap(false);
+            myMarkovChain->setMarkovDist(GEOMETRIC);
+            myMarkovChain->MakeDistribution(num, e->geomProb->value(), 0.0);
+            break;
+        case 8:
+            myMarkovChain->setUseChaosMap(false);
+            myMarkovChain->setMarkovDist(LOGNORMAL);
+            myMarkovChain->MakeDistribution(num, e->logNormM->value(), e->logNormS->value());
+            break;
+        case 9:
+            myMarkovChain->setUseChaosMap(false);
+            myMarkovChain->setMarkovDist(POISSON);
+            myMarkovChain->MakeDistribution(num, e->poisMean->value(),0.0);
             break;
         default:
             break;
@@ -750,7 +837,7 @@ void genText_cb(Fl_Widget* w, void* v)
     if(gen_setSeedWord(v)) {
         myMarkovChain->setFirstRun(true);
         myMarkovChain->setFirstWordInChain(true);
-        gen_SetupDistrib(v);
+        gen_SetupDistrib(num,v);
         gen_SetMaxNumWords(v);
         gen_SetMaxNumLines(v);
         //reset text buffer and counters if there already is generated text
@@ -768,11 +855,6 @@ void genCreateMarkovChain_cb(Fl_Widget* w, void *v)
 {
     EditorWindow* e = (EditorWindow*)v;
     myMarkovChain->setNumLevels(e->nLevelSlider->value());
-    if(e->removePunc->value() == 1)
-        myMarkovChain->setRemovePunc(true);
-    if(e->removeQuot->value() == 1)
-        myMarkovChain->setRemoveQuot(true);
-    
     gen_SetUpMarkovChain(v);
     
 }
@@ -799,21 +881,57 @@ void wcOk_cb()
 {
     
     int nextStart,nextEnd = -1;
+    if(myMarkovChain->getMarkovMode() == BY_WORD) {
     if(!appendMode) {
         textbuf->secondary_selection_position(&nextStart, &nextEnd);
         textbuf->replace(nextStart, nextEnd, "");
         textbuf->insert(nextStart, nextWord->value());
+        //unselect current text and make new word a primary selection
+        textbuf->unselect();
+        textbuf->secondary_unselect();
+        int fcnt = 0;
+        bool notFoundNext = true;
+        while (notFoundNext) {
+            textbuf->search_forward(nextStart, " ", &nextEnd);
+            fcnt++;
+            if(fcnt == 1 || nextEnd == -1)
+                notFoundNext = false;
+            
+        }
+        //make new selection, the newly selected word
+        textbuf->select(nextStart, nextEnd);
+
     } else {
         textbuf->selection_position(&nextStart, &nextEnd);
         textbuf->insert(nextEnd+1, " ");
         textbuf->insert(nextEnd+2, nextWord->value());
+        //unselect current text and make new word a primary selection
+        textbuf->unselect();
+        textbuf->secondary_unselect();
+        int newNextEnd = 0;
+        newNextEnd = textbuf->length();
+        /*bool notFoundNext = true;
+        while (notFoundNext) {
+            textbuf->search_forward(nextEnd+2, " ", &newNextEnd);
+            fcnt++;
+            if(fcnt == 1 || nextEnd == -1)
+                notFoundNext = false;
+            
+        }*/
+
+        textbuf->select(nextEnd+1, newNextEnd);
+    }
+    }
+    if(myMarkovChain->getMarkovMode() == BY_CHAR) {
+        
     }
     deleteWordChoiceObjects();
-    
 }
 
 void wcCancel_cb()
 {
+    textbuf->unselect();
+    textbuf->secondary_unselect();
     deleteWordChoiceObjects();
 }
 
@@ -840,27 +958,16 @@ void wordChoices_cb() {
     int pad = 150;
     int rows,cols,leftover=0;
     int nWidth,nHeight = 0;
-    int nextStart,nextEnd = -1;
-    int baseStart,baseEnd = -1;
-    int sel = -1;
+    int nextStart, nextEnd = -1;
     
     if(wordChoiceChecks.size() != 0)
         wordChoiceChecks.clear();
     
     if(textbuf->selected()) {
         string selWord = textbuf->selection_text();
-        sel = textbuf->selection_position(&baseStart, &baseEnd);
-    
-        bool notFoundNext = true;
-        int fcnt = 0;
-        nextStart = baseEnd+1;
-        while (notFoundNext) {
-            textbuf->search_forward(nextStart, " ", &nextEnd);
-            fcnt++;
-            if(fcnt == 2 || nextEnd == -1)
-                notFoundNext = false;
         
-        }
+        findNextWordEndPosition(&nextStart,&nextEnd);
+        
         string nextText;
         if(nextEnd != -1) {
             textbuf->secondary_select(nextStart, nextEnd);
@@ -963,8 +1070,9 @@ Fl_Menu_Item menuitems[] = {
     { "&File",              0, 0, 0, FL_SUBMENU },
     { "&New File",        0, (Fl_Callback *)new_cb },
     { "&Open File...",    FL_COMMAND + 'o', (Fl_Callback *)open_cb },
-    { "&Insert File...",  FL_COMMAND + 'i', (Fl_Callback *)insert_cb},
-    { "&Load Markov Text",  FL_COMMAND + 'm', (Fl_Callback *)loadMarkov_cb, 0, FL_MENU_DIVIDER },
+    { "&Insert File...",  FL_COMMAND + 'i', (Fl_Callback *)insert_cb,0, FL_MENU_DIVIDER },
+    { "&Load Markov Text",  FL_COMMAND + 'm', (Fl_Callback *)loadMarkov_cb},
+    { "&Clear Markov Text And Data",  FL_COMMAND + 'a', (Fl_Callback *)clearMarkov_cb,0, FL_MENU_DIVIDER },
     { "&Save File",       FL_COMMAND + 's', (Fl_Callback *)save_cb },
     { "Save File &As...", FL_COMMAND + FL_SHIFT + 's', (Fl_Callback *)saveas_cb, 0, FL_MENU_DIVIDER },
     { "New &View",        FL_ALT
@@ -1001,6 +1109,20 @@ Fl_Menu_Item menuitems[] = {
     { 0 }
 };
 
+void hideAll_Distrib(void *v)
+{
+    EditorWindow *e = (EditorWindow *)v;
+    e->normMean->hide();
+    e->normStdDev->hide();
+    e->binomUpBnd->hide();
+    e->binomProb->hide();
+    e->logNormM->hide();
+    e->logNormS->hide();
+    e->expLambda->hide();
+    e->geomProb->hide();
+    e->poisMean->hide();
+    
+}
 void distribution_cb(Fl_Widget *w, void *v)
 {
     EditorWindow *e = (EditorWindow *)v;
@@ -1009,8 +1131,10 @@ void distribution_cb(Fl_Widget *w, void *v)
         e->parEnd->hide();
         e->keepItr->hide();
         e->seedValue->hide();
+        hideAll_Distrib(v);
     }
     if(e->markovDist->value() == 1) {
+        hideAll_Distrib(v);
         e->parBegin->bounds(2.0, 4.0);
         e->parBegin->step(0.1);
         e->parBegin->value(2.8);
@@ -1025,6 +1149,7 @@ void distribution_cb(Fl_Widget *w, void *v)
         e->keepItr->show();
     }
     if(e->markovDist->value() == 2) {
+        hideAll_Distrib(v);
         e->parBegin->bounds(0.57, 0.135);
         e->parBegin->step(-0.05);
         e->parBegin->value(0.57);
@@ -1039,6 +1164,7 @@ void distribution_cb(Fl_Widget *w, void *v)
         e->keepItr->show();
     }
     if(e->markovDist->value() == 3) {
+        hideAll_Distrib(v);
         e->parBegin->bounds(-1.0, 1.0);
         e->parBegin->step(0.1);
         e->parBegin->value(-0.75);
@@ -1051,6 +1177,51 @@ void distribution_cb(Fl_Widget *w, void *v)
         e->seedValue->show();
         e->keepItr->value(1);
         e->keepItr->show();
+    }
+    if(e->markovDist->value() == 4) {
+        hideAll_Distrib(v);
+        e->normMean->bounds(0.0, 10.0);
+        e->normMean->step(0.1);
+        e->normStdDev->bounds(0.0, 10.0);
+        e->normStdDev->step(0.1);
+        e->normMean->show();
+        e->normStdDev->show();
+    }
+    if(e->markovDist->value() == 5) {
+        hideAll_Distrib(v);
+        e->binomUpBnd->bounds(0.0, 100.0);
+        e->binomUpBnd->step(1.0);
+        e->binomProb->bounds(0.0, 1.0);
+        e->binomProb->step(0.01);
+        e->binomUpBnd->show();
+        e->binomProb->show();
+    }
+    if(e->markovDist->value() == 6) {
+        hideAll_Distrib(v);
+        e->expLambda->bounds(0.0, 10.0);
+        e->expLambda->step(0.1);
+        e->expLambda->show();
+    }
+    if(e->markovDist->value() == 7) {
+        hideAll_Distrib(v);
+        e->geomProb->bounds(0.0, 1.0);
+        e->geomProb->step(0.01);
+        e->geomProb->show();
+    }
+    if(e->markovDist->value() == 8) {
+        hideAll_Distrib(v);
+        e->logNormM->bounds(0.0, 10.0);
+        e->logNormM->step(0.1);
+        e->logNormS->bounds(0.0, 5.0);
+        e->logNormS->step(0.05);
+        e->logNormM->show();
+        e->logNormS->show();
+    }
+    if(e->markovDist->value() == 9) {
+        hideAll_Distrib(v);
+        e->poisMean->bounds(0.0, 10.0);
+        e->poisMean->step(0.01);
+        e->poisMean->show();
     }
 }
 
@@ -1128,6 +1299,7 @@ Fl_Window* new_view() {
     w->removeQuot->labelsize(10);
     w->removeQuot->align(FL_ALIGN_TOP);
     w->removeQuot->labelfont(FL_BOLD);
+    w->removeQuot->value(1);
     
     //markov mode
     w->genText = new Fl_Button(300, 650, 120, 30, "&Generate Text");
@@ -1157,6 +1329,12 @@ Fl_Window* new_view() {
     w->markovDist->add("LOGISTIC MAP");
     w->markovDist->add("EXPONENTIAL MAP");
     w->markovDist->add("MOUSE MAP");
+    w->markovDist->add("NORMAL");
+    w->markovDist->add("BINOMIAL");
+    w->markovDist->add("EXPONENTIAL");
+    w->markovDist->add("GEOMETRIC");
+    w->markovDist->add("LOG NORMAL");
+    w->markovDist->add("POISSON");
     w->markovDist->callback((Fl_Callback *)distribution_cb, w);
     w->markovDist->value(0);
     
@@ -1179,8 +1357,8 @@ Fl_Window* new_view() {
     w->wordsPerLine = new Fl_Value_Slider(615,650,120, 30, "Words Per Line");
     w->wordsPerLine->type(FL_HOR_NICE_SLIDER);
     w->wordsPerLine->step(1);
-    w->wordsPerLine->value(15);
-    w->wordsPerLine->bounds(1, 50);
+    w->wordsPerLine->value(6);
+    w->wordsPerLine->bounds(1, 15);
     w->wordsPerLine->labelsize(10);
     w->wordsPerLine->labelfont(FL_BOLD);
     w->wordsPerLine->align(FL_ALIGN_TOP);
@@ -1188,8 +1366,8 @@ Fl_Window* new_view() {
     w->linesPerParagraph = new Fl_Value_Slider(615,700,120, 30, "Lines Per Paragraph");
     w->linesPerParagraph->type(FL_HOR_NICE_SLIDER);
     w->linesPerParagraph->step(1);
-    w->linesPerParagraph->value(15);
-    w->linesPerParagraph->bounds(1, 250);
+    w->linesPerParagraph->value(6);
+    w->linesPerParagraph->bounds(1, 50);
     w->linesPerParagraph->labelsize(10);
     w->linesPerParagraph->labelfont(FL_BOLD);
     w->linesPerParagraph->align(FL_ALIGN_TOP);
@@ -1211,8 +1389,8 @@ Fl_Window* new_view() {
     
     w->seedValue = new Fl_Value_Slider(895, 650, 120 ,30, "Seed Value");
     w->seedValue->type(FL_HOR_NICE_SLIDER);
-    w->seedValue->step(0.025);
-    w->seedValue->value(0.1);
+    w->seedValue->step(0.001);
+    w->seedValue->value(0.0);
     w->seedValue->bounds(0.0, 1.0);
     w->seedValue->labelsize(10);
     w->seedValue->labelfont(FL_BOLD);
@@ -1228,6 +1406,76 @@ Fl_Window* new_view() {
     w->keepItr->labelfont(FL_BOLD);
     w->keepItr->align(FL_ALIGN_TOP);
     w->keepItr->hide();
+    
+    //normal
+    //mean
+    w->normMean = new Fl_Value_Slider(755, 650, 120 , 30, "Normal Mean");
+    w->normMean->type(FL_HOR_NICE_SLIDER);
+    w->normMean->labelsize(10);
+    w->normMean->labelfont(FL_BOLD);
+    w->normMean->align(FL_ALIGN_TOP);
+    w->normMean->hide();
+    //stddev
+    w->normStdDev = new Fl_Value_Slider(755, 700, 120 , 30, "Normal StdDev");
+    w->normStdDev->type(FL_HOR_NICE_SLIDER);
+    w->normStdDev->labelsize(10);
+    w->normStdDev->labelfont(FL_BOLD);
+    w->normStdDev->align(FL_ALIGN_TOP);
+    w->normStdDev->hide();
+    //binomail
+    //upbnd
+    w->binomUpBnd = new Fl_Value_Slider(755, 650, 120 , 30, "Binomial Upper Bound");
+    w->binomUpBnd->type(FL_HOR_NICE_SLIDER);
+    w->binomUpBnd->labelsize(10);
+    w->binomUpBnd->labelfont(FL_BOLD);
+    w->binomUpBnd->align(FL_ALIGN_TOP);
+    w->binomUpBnd->hide();
+    //stddev
+    w->binomProb = new Fl_Value_Slider(755, 700, 120 , 30, "Binomial Prob");
+    w->binomProb->type(FL_HOR_NICE_SLIDER);
+    w->binomProb->labelsize(10);
+    w->binomProb->labelfont(FL_BOLD);
+    w->binomProb->align(FL_ALIGN_TOP);
+    w->binomProb->hide();
+    //exponetial
+    //lambda
+    w->expLambda = new Fl_Value_Slider(755, 650, 120 , 30, "Exponential");
+    w->expLambda->type(FL_HOR_NICE_SLIDER);
+    w->expLambda->labelsize(10);
+    w->expLambda->labelfont(FL_BOLD);
+    w->expLambda->align(FL_ALIGN_TOP);
+    w->expLambda->hide();
+    //geometric
+    //prob
+    w->geomProb = new Fl_Value_Slider(755, 650, 120 , 30, "Geometric");
+    w->geomProb->type(FL_HOR_NICE_SLIDER);
+    w->geomProb->labelsize(10);
+    w->geomProb->labelfont(FL_BOLD);
+    w->geomProb->align(FL_ALIGN_TOP);
+    w->geomProb->hide();
+    //lognorm
+    //upbnd
+    w->logNormM = new Fl_Value_Slider(755, 650, 120 , 30, "Log Normal Mean");
+    w->logNormM->type(FL_HOR_NICE_SLIDER);
+    w->logNormM->labelsize(10);
+    w->logNormM->labelfont(FL_BOLD);
+    w->logNormM->align(FL_ALIGN_TOP);
+    w->logNormM->hide();
+    //stddev
+    w->logNormS = new Fl_Value_Slider(755, 700, 120 , 30, "Log Normal StdDev");
+    w->logNormS->type(FL_HOR_NICE_SLIDER);
+    w->logNormS->labelsize(10);
+    w->logNormS->labelfont(FL_BOLD);
+    w->logNormS->align(FL_ALIGN_TOP);
+    w->logNormS->hide();
+    //poisson
+    //prob
+    w->poisMean = new Fl_Value_Slider(755, 650, 120 , 30, "Poisson Mean");
+    w->poisMean->type(FL_HOR_NICE_SLIDER);
+    w->poisMean->labelsize(10);
+    w->poisMean->labelfont(FL_BOLD);
+    w->poisMean->align(FL_ALIGN_TOP);
+    w->poisMean->hide();
 
 
     w->end();

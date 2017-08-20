@@ -20,6 +20,8 @@
 #include <istream>
 #include <fstream>
 #include <regex>
+#include <random>
+#include <chrono>
 
 
 using namespace std;
@@ -34,6 +36,7 @@ typedef map<string,levelMap> markovChainNLevel;
 typedef map<string,rLevelMap> markovProbChainNLevel;
 
 enum MarkovMode {BY_WORD = 0 , BY_CHAR};
+enum MarkovDist {RANDOM = 0, LOGISTIC_MAP, EXP_MAP, MOUSE_MAP, NORMAL, BINOMIAL, EXPONENTIAL, GEOMETRIC, LOGNORMAL, POISSON};
 
 class MarkovWordChain
 {
@@ -64,7 +67,11 @@ public:
     bool GetNextProbChainByChar();
     void GetNextStrInProbChainByChar();
     
+    void MakeDistribution(int num, float f1, float f2);
+    void NormalizeDistribution();
     float GetProbability();
+    
+    void ClearMarkovData();
     void ClearMarkovChain();
     void SetupMarkovChain();
     void SetupCharMarkovChain();
@@ -115,10 +122,14 @@ public:
     inline void setRemoveQuot(bool rmqt) { removeQuot = rmqt; }
     inline bool getRemoveQuot() { return removeQuot;}
     
+    inline void setMarkovDist(MarkovDist dist) { myDist = dist;}
+    MarkovDist getMarkovDist() { return myDist;}
+    
     wordMap *wMapPointer;
 private:
     vector<string> Words;
     vector<string> Letters;
+    vector<float> Distribution;
     
     //by words cumulative string or by char
     markovChain myMarkovChain;
@@ -155,6 +166,11 @@ private:
     //markov mode
     //cumulative token or N words away
     MarkovMode mmode;
+    MarkovDist myDist;
+    int distribCount;
+    
+    
+    
   
     
 };
