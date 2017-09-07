@@ -131,7 +131,6 @@ void MarkovWordChain::LoadTextIntoVectorByChar(string fname)
        // string str = string(&aChar);
         Words.push_back(aChar);
         aChar = file.get();
-        printf("FU: %s\n",aChar.c_str());
     }
     file.close();
     
@@ -245,6 +244,19 @@ void MarkovWordChain::LoadTextFromWordsToLetters()
 void MarkovWordChain::CreateMarkovWordChain()
 {
     int clevel = 0;
+    //loop end first
+    string activeString;
+    for(int i=0; i<nlevels; i++) {
+        if(i > 0)
+            activeString.append(" ");
+        
+        activeString.append(Words[Words.size()-(i+1)]);
+        wordMap *aWordMap = new wordMap;
+        aWordMap->insert(std::pair<string,float>(Words[0],1.0));
+        myMarkovChain.insert(std::pair<string,wordMap>(activeString,*aWordMap));
+        myMarkovChainCopy.insert(std::pair<string,wordMap>(activeString,*aWordMap));
+        delete aWordMap;
+    }
     for(int i=0; i<nlevels; i++) {
         clevel = nlevels - i;
         for(int j=0; j<Words.size()-clevel; j++) {
@@ -279,12 +291,18 @@ void MarkovWordChain::CreateMarkovWordChain()
         }
     }
     printf("Finished building markov chain: %lu\n",myMarkovChain.size());
+    for(markovChain::iterator it = myMarkovChain.begin(); it != myMarkovChain.end(); it++) {
+        for(wordMap::iterator iw = it->second.begin(); iw != it->second.end(); iw++) {
+            printf("KeyWord/Value: %s %s\n",it->first.c_str(),iw->first.c_str());
+        }
+    }
+
 }
 
 void MarkovWordChain::CreateMarkovCharChain()
 {
     printf("Letters size: %lu %d\n",Letters.size(),nlevels);
-    for(int i=0; i<Letters.size()-nlevels; i++) {
+    for(int i=0; i<((int)Letters.size()-nlevels); i++) {
         string keyString;
         string nextString;
         //build up the keyString and nextString
@@ -312,7 +330,37 @@ void MarkovWordChain::CreateMarkovCharChain()
             }
         }
     }
-    
+    //now connect last nlevel letters to first nlevel letters so
+    //we have a continuous loop in the data (fix code pasting)
+    for(int i=(int)(Letters.size()-nlevels); i<Letters.size(); i++) {
+        string keyString;
+        string nextString;
+        //build up the keyString and nextString
+        for(int j=0; j<nlevels; j++) {
+            keyString.append(Letters[i+j]);
+        }
+        //get next nlevel characters
+        for(int j=0; j<nlevels; j++) {
+            nextString.append(Letters[j]);
+        }
+        itMrk = myMarkovChain.find(keyString);
+        
+        if(itMrk == myMarkovChain.end()) {
+            wordMap *aWordMap = new wordMap;
+            aWordMap->insert(std::pair<string,float>(nextString,1.0));
+            myMarkovChain.insert(std::pair<string,wordMap>(keyString,*aWordMap));
+            delete aWordMap;
+        } else {
+            wordMap::iterator itMM = itMrk->second.find(nextString);
+            if(itMM == itMrk->second.end()) {
+                wordMap *aWordMap = &itMrk->second;
+                aWordMap->insert(std::pair<string,float>(nextString,1.0));
+            } else {
+                itMM->second = itMM->second + 1.0;
+            }
+        }
+
+    }
     printf("Finished building markov CHAR chain: %lu fw: %s\n",myMarkovChain.size(),GetFirstWord().c_str());
 }
 
@@ -507,10 +555,11 @@ bool MarkovWordChain::GetNextProbChain()
     //if this is multi-level and the end of the chain, the last
     //word in firstWord, is parsed out and used to start a new first
     //level chain
-    bool foundLinkInChain;
+    bool foundLinkInChain = false;
     itRMrk = myProbChain.find(firstWord);
     if(itRMrk == myProbChain.end() && firstWordInChain) {
         foundLinkInChain = false;
+        printf("Didn't find WORD %s in chain!\n",firstWord.c_str());
     } else {
         if(itRMrk == myProbChain.end()) {
             vector<string> splitWords = splitString(firstWord, " ");
@@ -527,7 +576,7 @@ bool MarkovWordChain::GetNextProbChain()
 
 bool MarkovWordChain::GetNextProbChainByChar()
 {
-    bool foundLinkInChain;
+    bool foundLinkInChain = false;
     itRMrk = myProbChain.find(firstWord);
     if(itRMrk == myProbChain.end()) {
         printf("DIDn't find fw: %s\n",firstWord.c_str());
@@ -553,7 +602,6 @@ void MarkovWordChain::GetNextWordInProbChain()
     float prevProb = 0.0;
     
     rnum = GetProbability();
-    
     for(rWordMap::iterator itMM = itRMrk->second.begin(); itMM != itRMrk->second.end(); itMM++) {
         if(rnum > prevProb && rnum < itMM->first) {
             foundWord.clear();

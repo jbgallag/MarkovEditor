@@ -220,13 +220,17 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = YES;
-				HEADER_SEARCH_PATHS = /usr/include;
+				HEADER_SEARCH_PATHS = (
+					/usr/include,
+					/usr/local/include,
+				);
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
 					"-I/usr/include",
+					"-I/usr/local/include",
 				);
 				OTHER_LDFLAGS = (
-					/usr/lib/libfltk.a,
+					/usr/local/lib/libfltk.a,
 					"-lpthread",
 					"-framework",
 					Cocoa,
@@ -239,13 +243,17 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = YES;
-				HEADER_SEARCH_PATHS = /usr/include;
+				HEADER_SEARCH_PATHS = (
+					/usr/include,
+					/usr/local/include,
+				);
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
 					"-I/usr/include",
+					"-I/usr/local/include",
 				);
 				OTHER_LDFLAGS = (
-					/usr/lib/libfltk.a,
+					/usr/local/lib/libfltk.a,
 					"-lpthread",
 					"-framework",
 					Cocoa,
@@ -273,6 +281,7 @@
 				A78DF31D1F0406E70050259F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};

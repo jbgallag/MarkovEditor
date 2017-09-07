@@ -1136,11 +1136,11 @@ void distribution_cb(Fl_Widget *w, void *v)
     if(e->markovDist->value() == 1) {
         hideAll_Distrib(v);
         e->parBegin->bounds(2.0, 4.0);
-        e->parBegin->step(0.1);
+        e->parBegin->step(0.01);
         e->parBegin->value(2.8);
         e->parBegin->show();
         e->parEnd->bounds(2.0, 4.0);
-        e->parEnd->step(0.1);
+        e->parEnd->step(0.01);
         e->parEnd->value(4.0);
         e->parEnd->show();
         e->seedValue->value(0.1);
