@@ -146,6 +146,7 @@ void MarkovWordChain::LoadTextIntoVector(string fname)
     regex tab("\\t+");
     regex rline("\\r+");
     regex nline("\\n+");
+    regex oneNline("\\s");
     regex quot("\"");
     
     regex ex("\\!");
@@ -212,9 +213,10 @@ void MarkovWordChain::LoadTextIntoVector(string fname)
             aLine = regex_replace(aLine, ltx, "");
             aLine = regex_replace(aLine, gts, "");
         }
-        aLine = regex_replace(aLine, tab, " ");
-        aLine = regex_replace(aLine, nline, " ");
-        aLine = regex_replace(aLine, rline, " ");
+        //aLine = regex_replace(aLine, tab, " ");
+        //aLine = regex_replace(aLine, nline, " ");
+        //aLine = regex_replace(aLine, rline, " ");
+        aLine = regex_replace(aLine, oneNline, " ");
         aLine = regex_replace(aLine, spc, " ");
         for(string::iterator itS = aLine.begin(); itS != aLine.end(); itS++) {
             string str;
@@ -290,28 +292,34 @@ void MarkovWordChain::CreateMarkovWordChain()
             }
         }
     }
-    printf("Finished building markov chain: %lu\n",myMarkovChain.size());
-    for(markovChain::iterator it = myMarkovChain.begin(); it != myMarkovChain.end(); it++) {
-        for(wordMap::iterator iw = it->second.begin(); iw != it->second.end(); iw++) {
-            printf("KeyWord/Value: %s %s\n",it->first.c_str(),iw->first.c_str());
-        }
-    }
-
+   
 }
 
 void MarkovWordChain::CreateMarkovCharChain()
 {
     printf("Letters size: %lu %d\n",Letters.size(),nlevels);
-    for(int i=0; i<((int)Letters.size()-nlevels); i++) {
+    for(int i=0; i<(int)Letters.size(); i++) {
         string keyString;
         string nextString;
         //build up the keyString and nextString
         for(int j=0; j<nlevels; j++) {
-            keyString.append(Letters[i+j]);
+            int idx = -1;
+            if((i+j) >= (int)Letters.size()) {
+                idx = (i+j)-(int)Letters.size();
+            } else {
+                idx = i+j;
+            }
+            keyString.append(Letters[idx]);
         }
         //get next nlevel characters
         for(int j=0; j<nlevels; j++) {
-            nextString.append(Letters[i+nlevels+j]);
+            int idx = -1;
+            if((i+nlevels+j) >= (int)Letters.size()) {
+                idx = (i+nlevels+j) - (int)Letters.size();
+            } else {
+                idx = i+nlevels+j;
+            }
+            nextString.append(Letters[idx]);
         }
         itMrk = myMarkovChain.find(keyString);
   
@@ -329,37 +337,6 @@ void MarkovWordChain::CreateMarkovCharChain()
                 itMM->second = itMM->second + 1.0;
             }
         }
-    }
-    //now connect last nlevel letters to first nlevel letters so
-    //we have a continuous loop in the data (fix code pasting)
-    for(int i=(int)(Letters.size()-nlevels); i<Letters.size(); i++) {
-        string keyString;
-        string nextString;
-        //build up the keyString and nextString
-        for(int j=0; j<nlevels; j++) {
-            keyString.append(Letters[i+j]);
-        }
-        //get next nlevel characters
-        for(int j=0; j<nlevels; j++) {
-            nextString.append(Letters[j]);
-        }
-        itMrk = myMarkovChain.find(keyString);
-        
-        if(itMrk == myMarkovChain.end()) {
-            wordMap *aWordMap = new wordMap;
-            aWordMap->insert(std::pair<string,float>(nextString,1.0));
-            myMarkovChain.insert(std::pair<string,wordMap>(keyString,*aWordMap));
-            delete aWordMap;
-        } else {
-            wordMap::iterator itMM = itMrk->second.find(nextString);
-            if(itMM == itMrk->second.end()) {
-                wordMap *aWordMap = &itMrk->second;
-                aWordMap->insert(std::pair<string,float>(nextString,1.0));
-            } else {
-                itMM->second = itMM->second + 1.0;
-            }
-        }
-
     }
     printf("Finished building markov CHAR chain: %lu fw: %s\n",myMarkovChain.size(),GetFirstWord().c_str());
 }
