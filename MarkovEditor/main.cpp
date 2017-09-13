@@ -74,6 +74,7 @@ int maxLinesPerParagraph;
 int firstLinePos = 0;
 bool newGen = true;
 bool haveGeneratedText = false;
+bool wordChoiceActive = false;
 MarkovWordChain *myMarkovChain = new MarkovWordChain();
 
 // width of line number display, if enabled
@@ -875,6 +876,7 @@ void deleteWordChoiceObjects()
 
     wordChoiceChecks.clear();
     appendMode = false;
+    wordChoiceActive = false;
 }
 
 void wcOk_cb()
@@ -960,109 +962,112 @@ void wordChoices_cb() {
     int nWidth,nHeight = 0;
     int nextStart, nextEnd = -1;
     
-    if(wordChoiceChecks.size() != 0)
-        wordChoiceChecks.clear();
+    if(!wordChoiceActive) {
+        wordChoiceActive = true;
+        if(wordChoiceChecks.size() != 0)
+            wordChoiceChecks.clear();
     
-    if(textbuf->selected()) {
-        string selWord = textbuf->selection_text();
+        if(textbuf->selected()) {
+            string selWord = textbuf->selection_text();
         
-        findNextWordEndPosition(&nextStart,&nextEnd);
+            findNextWordEndPosition(&nextStart,&nextEnd);
         
-        string nextText;
-        if(nextEnd != -1) {
-            textbuf->secondary_select(nextStart, nextEnd);
-            textbuf->highlight(nextStart, nextEnd);
-            nextText = textbuf->secondary_selection_text();
-        } else {
-            appendMode = true;
-        }
-        myMarkovChain->SetWordMapPointer(selWord);
+            string nextText;
+            if(nextEnd != -1) {
+                textbuf->secondary_select(nextStart, nextEnd);
+                textbuf->highlight(nextStart, nextEnd);
+                nextText = textbuf->secondary_selection_text();
+            } else {
+                appendMode = true;
+            }
+            myMarkovChain->SetWordMapPointer(selWord);
     
-        cols = (int)ceil(sqrt((double)myMarkovChain->wMapPointer->size()));
-        if(cols*cols < myMarkovChain->wMapPointer->size()) {
-            rows = cols+1;
-            leftover = (rows*cols) - (int)myMarkovChain->wMapPointer->size();
-        } else {
-            rows = cols;
-        }
-        nWidth = pad+(cols*cols_size);
-        nHeight = pad+(rows*rows_size);
-        if(nWidth > maxWidth)
-            nWidth = 800;
-        if(nHeight > maxHeight)
-            nHeight = 600;
+            cols = (int)ceil(sqrt((double)myMarkovChain->wMapPointer->size()));
+            if(cols*cols < myMarkovChain->wMapPointer->size()) {
+                rows = cols+1;
+                leftover = (rows*cols) - (int)myMarkovChain->wMapPointer->size();
+            } else {
+                rows = cols;
+            }
+            nWidth = pad+(cols*cols_size);
+            nHeight = pad+(rows*rows_size);
+            if(nWidth > maxWidth)
+                nWidth = 800;
+            if(nHeight > maxHeight)
+                nHeight = 600;
     
-        wordChoices = new Fl_Double_Window(nWidth, nHeight, "WordChoices");
-        wordChoiceScroll = new Fl_Scroll(0,0,nWidth,nHeight);
-        wordChoiceScroll->box(FL_DOWN_FRAME);
+            wordChoices = new Fl_Double_Window(nWidth, nHeight, "WordChoices");
+            wordChoiceScroll = new Fl_Scroll(0,0,nWidth,nHeight);
+            wordChoiceScroll->box(FL_DOWN_FRAME);
     
-        baseWord = new Fl_Output(10,30,120,30,"Base Word:");
-        baseWord->labelsize(10);
-        baseWord->align(FL_ALIGN_TOP);
-        baseWord->labelfont(FL_BOLD);
-        baseWord->value(selWord.c_str());
+            baseWord = new Fl_Output(10,30,120,30,"Base Word:");
+            baseWord->labelsize(10);
+            baseWord->align(FL_ALIGN_TOP);
+            baseWord->labelfont(FL_BOLD);
+            baseWord->value(selWord.c_str());
     
-        baseCount = new Fl_Output(130,30,60,30,"Count:");
-        baseCount->labelsize(10);
-        baseCount->align(FL_ALIGN_TOP);
-        baseCount->labelfont(FL_BOLD);
-        char dnum[6];
-        sprintf(dnum, "%d",(int)myMarkovChain->GetBaseWordSum(selWord));
-        baseCount->value(dnum);
+            baseCount = new Fl_Output(130,30,60,30,"Count:");
+            baseCount->labelsize(10);
+            baseCount->align(FL_ALIGN_TOP);
+            baseCount->labelfont(FL_BOLD);
+            char dnum[6];
+            sprintf(dnum, "%d",(int)myMarkovChain->GetBaseWordSum(selWord));
+            baseCount->value(dnum);
     
-        nextWord = new Fl_Output(190,30,120,30,"Next Word:");
-        nextWord->labelsize(10);
-        nextWord->align(FL_ALIGN_TOP);
-        nextWord->labelfont(FL_BOLD);
-        nextWord->value(nextText.c_str());
+            nextWord = new Fl_Output(190,30,120,30,"Next Word:");
+            nextWord->labelsize(10);
+            nextWord->align(FL_ALIGN_TOP);
+            nextWord->labelfont(FL_BOLD);
+            nextWord->value(nextText.c_str());
     
-        nextCount = new Fl_Output(310,30,60,30,"Count:");
-        nextCount->labelsize(10);
-        nextCount->align(FL_ALIGN_TOP);
-        nextCount->labelfont(FL_BOLD);
-        sprintf(dnum, "%d",(int)myMarkovChain->GetNextWordCount(selWord, nextText));
-        nextCount->value(dnum);
+            nextCount = new Fl_Output(310,30,60,30,"Count:");
+            nextCount->labelsize(10);
+            nextCount->align(FL_ALIGN_TOP);
+            nextCount->labelfont(FL_BOLD);
+            sprintf(dnum, "%d",(int)myMarkovChain->GetNextWordCount(selWord, nextText));
+            nextCount->value(dnum);
     
-        nextPerc = new Fl_Output(370,30,60,30,"Percent:");
-        nextPerc->labelsize(10);
-        nextPerc->align(FL_ALIGN_TOP);
-        nextPerc->labelfont(FL_BOLD);
-        sprintf(dnum, "%0.3f",myMarkovChain->GetNextWordCount(selWord, nextText));
-        nextPerc->value(dnum);
+            nextPerc = new Fl_Output(370,30,60,30,"Percent:");
+            nextPerc->labelsize(10);
+            nextPerc->align(FL_ALIGN_TOP);
+            nextPerc->labelfont(FL_BOLD);
+            sprintf(dnum, "%0.3f",myMarkovChain->GetNextWordCount(selWord, nextText));
+            nextPerc->value(dnum);
 
-        wordMap::iterator itM = myMarkovChain->wMapPointer->begin();
-        int c=0;
-        int xloc,yloc = 0;
-        for(int i=0; i<cols; i++) {
-            for(int j=0; j<rows; j++) {
-                if(c < (int)myMarkovChain->wMapPointer->size()) {
-                    xloc = 150+(j*cols_size);
-                    yloc = 75+(i*rows_size);
-                    Fl_Round_Button *wccb = new Fl_Round_Button(xloc,yloc, 30, 30, itM->first.c_str());
-                    wccb->type(FL_RADIO_BUTTON);
-                    wccb->labelsize(16);
-                    wccb->align(FL_ALIGN_LEFT);
-                    wccb->labelfont(FL_BOLD);
-                    wccb->callback((Fl_Callback *)wcRadio_cb);
-                    itM++;
-                    wordChoiceChecks[c] = wccb;
-                    c++;
+            wordMap::iterator itM = myMarkovChain->wMapPointer->begin();
+            int c=0;
+            int xloc,yloc = 0;
+            for(int i=0; i<cols; i++) {
+                for(int j=0; j<rows; j++) {
+                    if(c < (int)myMarkovChain->wMapPointer->size()) {
+                        xloc = 150+(j*cols_size);
+                        yloc = 75+(i*rows_size);
+                        Fl_Round_Button *wccb = new Fl_Round_Button(xloc,yloc, 30, 30, itM->first.c_str());
+                        wccb->type(FL_RADIO_BUTTON);
+                        wccb->labelsize(16);
+                        wccb->align(FL_ALIGN_LEFT);
+                        wccb->labelfont(FL_BOLD);
+                        wccb->callback((Fl_Callback *)wcRadio_cb);
+                        itM++;
+                        wordChoiceChecks[c] = wccb;
+                        c++;
+                    }
                 }
             }
-        }
 
-        wcOk = new Fl_Return_Button(20, yloc+50, 120, 30, "&Replace Word");
-        wcOk->labelsize(10);
-        wcOk->labelfont(FL_BOLD);
-        wcOk->callback((Fl_Callback *)wcOk_cb);
+            wcOk = new Fl_Return_Button(20, yloc+50, 120, 30, "&Replace Word");
+            wcOk->labelsize(10);
+            wcOk->labelfont(FL_BOLD);
+            wcOk->callback((Fl_Callback *)wcOk_cb);
     
-        wcCancel = new Fl_Return_Button(160, yloc+50, 120, 30, "&Cancel");
-        wcCancel->labelsize(10);
-        wcCancel->labelfont(FL_BOLD);
-        wcCancel->callback((Fl_Callback *)wcCancel_cb);
+            wcCancel = new Fl_Return_Button(160, yloc+50, 120, 30, "&Cancel");
+            wcCancel->labelsize(10);
+            wcCancel->labelfont(FL_BOLD);
+            wcCancel->callback((Fl_Callback *)wcCancel_cb);
    
-        wordChoices->end();
-        wordChoices->show();
+            wordChoices->end();
+            wordChoices->show();
+        }
     }
 }
 
